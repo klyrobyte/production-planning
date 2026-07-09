@@ -5,3 +5,11 @@ dist/
 *.log
 backups/
 sc-prod/
+
+# Environment files di semua subfolder
+**/.env
+**/.env.local
+**/.env.production
+
+migrations/
+seeds/
