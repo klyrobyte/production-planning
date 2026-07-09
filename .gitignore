@@ -1,0 +1,7 @@
+sampah/
+node_modules/
+dist/
+.env
+*.log
+backups/
+sc-prod/
