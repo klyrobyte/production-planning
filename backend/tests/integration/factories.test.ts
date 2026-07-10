@@ -1,11 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import bcrypt from 'bcrypt';
 import { createApp } from '../../src/app';
 import { pool } from '../../src/config/database';
 import { redis } from '../../src/config/redis';
 
 describe('Factories Integration Tests', () => {
   const app = createApp();
+
+  // Dynamic test data variables
+  const testAdminUsername = `test_admin_fac_${Date.now()}`;
+  const testPlannerUsername = `test_plan_fac_${Date.now()}`;
+  const testPassword = 'testpassword123';
+  
+  let testAdminUserId: string;
+  let testPlannerUserId: string;
   let adminCookie: any;
   let plannerCookie: any;
   let createdFactoryId: string;
@@ -14,23 +23,48 @@ describe('Factories Integration Tests', () => {
     await pool.query('SELECT 1');
     await redis.connect();
 
-    // Setup sessions
+    // 1. Create dynamic super-admin user in DB
+    const adminPasswordHash = await bcrypt.hash(testPassword, 10);
+    const adminResult = await pool.query(
+      'INSERT INTO users (uid, username, role, name, password_hash) VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING id',
+      [testAdminUsername, 'super-admin', 'Test Admin Fac', adminPasswordHash]
+    );
+    testAdminUserId = adminResult.rows[0].id;
+
+    // 2. Create dynamic planner user in DB
+    const plannerPasswordHash = await bcrypt.hash(testPassword, 10);
+    const plannerResult = await pool.query(
+      'INSERT INTO users (uid, username, role, name, password_hash) VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING id',
+      [testPlannerUsername, 'planner', 'Test Planner Fac', plannerPasswordHash]
+    );
+    testPlannerUserId = plannerResult.rows[0].id;
+
+    // 3. Setup sessions by logging in dynamically
     const adminLogin = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'admin', password: 'admin123' });
+      .send({ username: testAdminUsername, password: testPassword });
     adminCookie = adminLogin.headers['set-cookie'];
 
     const plannerLogin = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'planner', password: 'planner123' });
+      .send({ username: testPlannerUsername, password: testPassword });
     plannerCookie = plannerLogin.headers['set-cookie'];
   });
 
   afterAll(async () => {
-    // Cleanup any created factory just in case delete test failed
+    // Cleanup any created factory
     if (createdFactoryId) {
       await pool.query('DELETE FROM factories WHERE id = $1', [createdFactoryId]);
     }
+    
+    // Cleanup dynamic test users
+    if (testAdminUserId) {
+      await pool.query('DELETE FROM users WHERE id = $1', [testAdminUserId]);
+    }
+    if (testPlannerUserId) {
+      await pool.query('DELETE FROM users WHERE id = $1', [testPlannerUserId]);
+    }
+
     await pool.end();
     await redis.disconnect();
   });

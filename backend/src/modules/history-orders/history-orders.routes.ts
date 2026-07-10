@@ -24,11 +24,19 @@ export const historyOrdersRoutes = Router();
  *             type: array
  *             items:
  *               type: object
- *               required: [part_number, quantity, date]
+ *               required: [part_number]
  *               properties:
+ *                 sebango: { type: string }
  *                 part_number: { type: string }
- *                 quantity: { type: number }
- *                 date: { type: string, format: date }
+ *                 part_name: { type: string }
+ *                 month_n_volume: { type: number }
+ *                 month_n1_volume: { type: number }
+ *                 month_n2_volume: { type: number }
+ *                 month_n3_volume: { type: number }
+ *                 daily_requirement_n: { type: number }
+ *                 daily_requirement_n1: { type: number }
+ *                 daily_requirement_n2: { type: number }
+ *                 daily_requirement_n3: { type: number }
  *     responses:
  *       201: { description: Success }
  */

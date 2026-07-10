@@ -9,6 +9,10 @@ export const createRateLimiter = (keyPrefix: string, points = 5, duration = 60) 
   const limiter = new RateLimiterRedis({ storeClient: redis, keyPrefix, points, duration });
 
   return async (req: Request, _res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'test' && req.headers['x-test-rate-limit'] !== 'true') {
+      next();
+      return;
+    }
     const ip = String(req.headers['x-forwarded-for'] || req.ip || 'unknown').split(',')[0].trim();
     try {
       await limiter.consume(ip);

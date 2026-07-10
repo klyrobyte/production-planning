@@ -44,9 +44,9 @@ export const requireRole = (...allowedRoles: string[]) =>
       next(new AppError(403, 'FORBIDDEN', 'Your role is no longer valid.'));
       return;
     }
-    if (!allowedRoles.includes(userRole)) {
-      next(new AppError(403, 'FORBIDDEN', 'You do not have permission to perform this action.'));
+    if (userRole === 'super-admin' || allowedRoles.includes(userRole)) {
+      next();
       return;
     }
-    next();
+    next(new AppError(403, 'FORBIDDEN', 'You do not have permission to perform this action.'));
   };

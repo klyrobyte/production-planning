@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { authService } from './auth.service';
+import { verifyToken } from './jwt.util';
 import { env } from '../../config/env';
 
 const cookieOpts = {
@@ -12,6 +13,17 @@ const cookieOpts = {
 export const authController = {
   // POST /api/auth/login
   login: async (req: Request, res: Response) => {
+    // Prevent double login
+    const existingToken = req.cookies?.[env.cookieName];
+    if (existingToken && verifyToken(existingToken)) {
+      res.status(400).json({
+        status: 'error',
+        code: 'ALREADY_AUTHENTICATED',
+        message: 'Anda sudah login. Silakan logout terlebih dahulu.',
+      });
+      return;
+    }
+
     const { username, password } = req.body;
     if (!username || !password) {
       res.status(400).json({ status: 'error', code: 'VALIDATION_ERROR', message: 'Username dan password wajib diisi.' });

@@ -13,6 +13,18 @@ export const rolesRoutes = Router();
  *   post:
  *     tags: [Roles]
  *     summary: Tambah role baru (super-admin)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, display_name]
+ *             properties:
+ *               name: { type: string }
+ *               display_name: { type: string }
+ *     responses:
+ *       201: { description: Created }
  * /api/roles/{id}:
  *   delete:
  *     tags: [Roles]
