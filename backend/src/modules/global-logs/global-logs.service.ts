@@ -25,7 +25,7 @@ export async function getLogs(query: Record<string, unknown>): Promise<Paginated
   if (query.status_code !== undefined) {
     const code = parseInt(String(query.status_code), 10);
     if (isNaN(code) || code < 100 || code > 599) {
-      throw new AppError('status_code harus berupa HTTP status code yang valid (100-599)', 400, 'VALIDATION_ERROR');
+      throw new AppError(400, 'VALIDATION_ERROR', 'status_code harus berupa HTTP status code yang valid (100-599)');
     }
     filters.status_code = code;
   }

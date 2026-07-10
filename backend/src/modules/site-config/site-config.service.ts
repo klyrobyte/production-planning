@@ -19,7 +19,7 @@ export async function patchConfig(
   updatedBy: string,
 ): Promise<SiteConfig> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    throw new AppError('Request body harus berupa JSON object.', 400, 'VALIDATION_ERROR');
+    throw new AppError(400, 'VALIDATION_ERROR', 'Request body harus berupa JSON object.');
   }
 
   const input = body as Record<string, unknown>;
@@ -32,9 +32,9 @@ export async function patchConfig(
       const value = input[key];
       if (typeof value !== 'string' || !HEX_COLOR_REGEX.test(value)) {
         throw new AppError(
-          `Nilai untuk "${key}" harus berupa hex color yang valid (contoh: #008d51 atau #fff).`,
           400,
           'VALIDATION_ERROR',
+          `Nilai untuk "${key}" harus berupa hex color yang valid (contoh: #008d51 atau #fff).`,
         );
       }
       updates[key as ConfigKey] = value;
@@ -43,9 +43,9 @@ export async function patchConfig(
 
   if (Object.keys(updates).length === 0) {
     throw new AppError(
-      `Tidak ada key yang valid. Key yang diperbolehkan: ${ALLOWED_CONFIG_KEYS.join(', ')}.`,
       400,
       'VALIDATION_ERROR',
+      `Tidak ada key yang valid. Key yang diperbolehkan: ${ALLOWED_CONFIG_KEYS.join(', ')}.`,
     );
   }
 
