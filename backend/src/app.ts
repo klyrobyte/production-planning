@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger/swagger.config';
 import { errorHandler } from './common/middlewares/error-handler.middleware';
+import { auditLogMiddleware } from './common/middlewares/audit-log.middleware';
 import { authRoutes } from './modules/auth/auth.routes';
 import { usersRoutes } from './modules/users/users.routes';
 import { rolesRoutes } from './modules/roles/roles.routes';
@@ -15,6 +16,8 @@ import { orderConversionsRoutes } from './modules/order-conversions/order-conver
 import { labelCountersRoutes } from './modules/label-counters/label-counters.routes';
 import { historyOrdersRoutes } from './modules/history-orders/history-orders.routes';
 import { createProductionPlansRoutes } from './modules/production-plans/production-plans.routes';
+import { globalLogsRoutes } from './modules/global-logs/global-logs.routes';
+import { siteConfigRoutes } from './modules/site-config/site-config.routes';
 import { Server as SocketServer } from 'socket.io';
 
 // Creates and configures the Express app
@@ -26,6 +29,9 @@ export const createApp = (io?: SocketServer) => {
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
+
+  // --- Audit Log Middleware (must be before routes so res.on('finish') fires correctly) ---
+  app.use(auditLogMiddleware);
 
   // --- API Documentation ---
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -42,6 +48,8 @@ export const createApp = (io?: SocketServer) => {
   app.use('/api/label-counters',    labelCountersRoutes);
   app.use('/api/history-orders',    historyOrdersRoutes);
   app.use('/api/production-plans',  createProductionPlansRoutes(io));
+  app.use('/api/global-logs',       globalLogsRoutes);
+  app.use('/api/site-config',       siteConfigRoutes);
 
   // Health check — useful for Docker and uptime monitors
   app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
