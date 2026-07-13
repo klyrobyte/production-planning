@@ -3,7 +3,7 @@ import { saveLog } from '../../modules/global-logs/global-logs.repository';
 import { auditLogEmitter } from '../events/audit-log.emitter';
 
 // Paths excluded from audit logging — too noisy or non-user-driven
-const EXCLUDED_PREFIXES = ['/health', '/api/docs'];
+const EXCLUDED_PREFIXES = ['/health', '/api/docs', '/api/global-logs/stream'];
 
 /**
  * Global audit log middleware.
@@ -21,6 +21,12 @@ export function auditLogMiddleware(req: Request, res: Response, next: NextFuncti
   // Skip excluded paths immediately
   const shouldSkip = EXCLUDED_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
   if (shouldSkip) {
+    next();
+    return;
+  }
+
+  // Skip GET /api/site-config since it is requested automatically by every client on bootstrap
+  if (req.method === 'GET' && endpoint === '/api/site-config') {
     next();
     return;
   }
