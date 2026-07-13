@@ -5,7 +5,8 @@ import {
   ScrollText, 
   Settings, 
   Database,
-  Users
+  Users,
+  Cpu
 } from 'lucide-react';
 import type { UserRole } from '../store/useAuthStore';
 
@@ -47,6 +48,20 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     path: '/database',
     icon: Database,
     allowedRoles: ['super-admin', 'planner'],
+  },
+  {
+    id: 'factories',
+    label: 'Factory Management',
+    path: '/factories',
+    icon: Factory,
+    allowedRoles: ['super-admin'],
+  },
+  {
+    id: 'machines',
+    label: 'Machine Management',
+    path: '/machines',
+    icon: Cpu,
+    allowedRoles: ['super-admin'],
   },
   {
     id: 'users',

@@ -43,11 +43,13 @@ function ProductionPlaceholder() {
     </div>
   );
 }
-
 import LoginPage from './features/auth/pages/LoginPage';
 import UsersPage from './features/users/pages/UsersPage';
 import GlobalLogsPage from './features/global-logs/pages/GlobalLogsPage';
 import SiteConfigPage from './features/site-config/pages/SiteConfigPage';
+import FactoriesPage from './features/factories/pages/FactoriesPage';
+import MachinesPage from './features/machines/pages/MachinesPage';
+
 
 // Inline placeholder for database management
 function DatabasePlaceholder() {
@@ -60,7 +62,6 @@ function DatabasePlaceholder() {
     </div>
   );
 }
-
 // Core App bootstrap layout logic
 function AppContent() {
   const fetchTheme = useThemeStore((state) => state.fetchTheme);
@@ -99,9 +100,10 @@ function AppContent() {
             <Route path="/production" element={<ProductionPlaceholder />} />
             <Route path="/database" element={<DatabasePlaceholder />} />
             
-            {/* Superadmin restricted paths */}
             <Route element={<ProtectedRoute allowedRoles={['super-admin']} />}>
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/factories" element={<FactoriesPage />} />
+              <Route path="/machines" element={<MachinesPage />} />
               <Route path="/global-logs" element={<GlobalLogsPage />} />
               <Route path="/site-config" element={<SiteConfigPage />} />
             </Route>
