@@ -1,122 +1,134 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useThemeStore } from './shared/store/useThemeStore';
+import { useAuthStore } from './shared/store/useAuthStore';
+import { AppProviders } from './app/providers';
+import ProtectedRoute from './shared/components/layout/ProtectedRoute';
+import PageLayout from './shared/components/layout/PageLayout';
+import NotFoundPage from './shared/pages/NotFoundPage';
+import ForbiddenPage from './shared/pages/ForbiddenPage';
 
-function App() {
-  const [count, setCount] = useState(0)
-
+// Inline placeholder for landing dashboard
+function DashboardPlaceholder() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
+      <h3 className="text-lg font-bold text-slate-800 uppercase">3M Dashboard</h3>
+      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+        Selamat datang di Portal Perencanaan Produksi PT. Sugity Creatives. Halaman Dashboard sedang dalam pengembangan.
+      </p>
+    </div>
+  );
 }
 
-export default App
+// Inline placeholder for orders management
+function OrdersPlaceholder() {
+  return (
+    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
+      <h3 className="text-lg font-bold text-slate-800 uppercase">Orders Management</h3>
+      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+        Halaman pengimporan order dan mapping conversion sedang dalam pengembangan.
+      </p>
+    </div>
+  );
+}
+
+// Inline placeholder for production monitoring
+function ProductionPlaceholder() {
+  return (
+    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
+      <h3 className="text-lg font-bold text-slate-800 uppercase">Production Control</h3>
+      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+        Halaman visualisasi timeline Heijunka dan monitoring mesin sedang dalam pengembangan.
+      </p>
+    </div>
+  );
+}
+
+import LoginPage from './features/auth/pages/LoginPage';
+import UsersPage from './features/users/pages/UsersPage';
+import GlobalLogsPage from './features/global-logs/pages/GlobalLogsPage';
+import SiteConfigPage from './features/site-config/pages/SiteConfigPage';
+
+// Inline placeholder for database management
+function DatabasePlaceholder() {
+  return (
+    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
+      <h3 className="text-lg font-bold text-slate-800 uppercase">Database Manager</h3>
+      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+        Halaman pengelola Master Parts, Mesin, dan PIN Leader sedang dalam pengembangan.
+      </p>
+    </div>
+  );
+}
+
+// Core App bootstrap layout logic
+function AppContent() {
+  const fetchTheme = useThemeStore((state) => state.fetchTheme);
+  const checkSession = useAuthStore((state) => state.checkSession);
+  const isCheckingSession = useAuthStore((state) => state.isCheckingSession);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  // Initialize theme config and load current session token
+  useEffect(() => {
+    fetchTheme();
+    checkSession();
+  }, [fetchTheme, checkSession]);
+
+  if (isCheckingSession) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-primary"></div>
+          <p className="text-sm font-semibold tracking-wider text-slate-500 uppercase">Loading System...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public Login Route */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Protected Area wrapping inside PageLayout Shell */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<PageLayout />}>
+            <Route path="/dashboard" element={<DashboardPlaceholder />} />
+            <Route path="/orders" element={<OrdersPlaceholder />} />
+            <Route path="/production" element={<ProductionPlaceholder />} />
+            <Route path="/database" element={<DatabasePlaceholder />} />
+            
+            {/* Superadmin restricted paths */}
+            <Route element={<ProtectedRoute allowedRoles={['super-admin']} />}>
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/global-logs" element={<GlobalLogsPage />} />
+              <Route path="/site-config" element={<SiteConfigPage />} />
+            </Route>
+          </Route>
+        </Route>
+
+        {/* Default Route redirect */}
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+          }
+        />
+
+        {/* Error Fallback Routes */}
+        <Route path="/forbidden" element={<ForbiddenPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// Root entry point wrapping context clients
+export default function App() {
+  return (
+    <AppProviders>
+      <AppContent />
+    </AppProviders>
+  );
+}
