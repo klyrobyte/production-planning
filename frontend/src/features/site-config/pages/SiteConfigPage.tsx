@@ -114,7 +114,7 @@ export default function SiteConfigPage() {
         color_navbar: '#037233',
         system_title: 'PT. Sugity Creatives',
         system_logo: '',
-        browser_title: 'frontend',
+        browser_title: 'SC Prod Plan',
       });
       setSuccessMsg('Branding warna dan identitas telah dikembalikan ke standar bawaan.');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -129,58 +129,58 @@ export default function SiteConfigPage() {
     <div className="space-y-6">
       {/* Top Header */}
       <div className="text-left">
-        <p className="text-xs font-black uppercase tracking-wider text-slate-400">System Preferences</p>
-        <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 mt-0.5">Pengaturan Site Config</h2>
+        <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">System Preferences</p>
+        <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 dark:text-slate-100 mt-0.5">Pengaturan Site Config</h2>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Configuration Panel */}
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-5 flex flex-col justify-between">
+        <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm lg:col-span-5 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-6">
-              <Palette className="h-4.5 w-4.5 text-slate-400" />
-              <span className="text-xs font-black uppercase tracking-wider text-slate-600">Identitas & Tema Warna</span>
+            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+              <Palette className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-350">Identitas & Tema Warna</span>
             </div>
 
             <div className="space-y-5">
               {/* Judul Sistem */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Judul Sistem</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Nama sistem yang tampil di navbar/sidebar</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Judul Sistem</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Nama sistem yang tampil di navbar/sidebar</p>
                 </div>
                 <input
                   type="text"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
                   placeholder="Contoh: SC Prod Plan"
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-600 outline-none focus:border-brand-primary"
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900"
                 />
               </div>
 
               {/* Judul Tab Browser */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Judul Tab Browser</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Nama yang tampil di bagian atas tab browser</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Judul Tab Browser</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Nama yang tampil di bagian atas tab browser</p>
                 </div>
                 <input
                   type="text"
                   value={browserTitleInput}
                   onChange={(e) => setBrowserTitleInput(e.target.value)}
                   placeholder="Contoh: SC Prod Plan"
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-600 outline-none focus:border-brand-primary"
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900"
                 />
               </div>
 
               {/* Logo Sistem */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Logo Sistem</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Upload file logo aplikasi (Format gambar, maks. 500KB)</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Logo Sistem</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Upload file logo aplikasi (Format gambar, maks. 500KB)</p>
                 </div>
                 <div className="flex items-center gap-3 mt-1.5">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-slate-200 p-1.5 shrink-0 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-1.5 shrink-0 shadow-sm">
                     <img
                       src={logoInput || '/logo.png'}
                       alt="Logo Preview"
@@ -192,11 +192,10 @@ export default function SiteConfigPage() {
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
-                      className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-2 px-3 text-[9px] font-black uppercase tracking-wider transition ${
-                        isDragging
+                      className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-2 px-3 text-[9px] font-black uppercase tracking-wider transition ${isDragging
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                          : 'border-slate-300 text-slate-500 hover:bg-white hover:text-slate-700 hover:border-slate-400'
-                      } cursor-pointer`}
+                          : 'border-slate-300 dark:border-slate-850 text-slate-500 dark:text-slate-450 hover:bg-white dark:hover:bg-slate-950 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-700'
+                        } cursor-pointer`}
                     >
                       <Upload className="h-3.5 w-3.5" />
                       <span>{isDragging ? 'Drop logo di sini' : 'Drag & Drop / Upload'}</span>
@@ -210,7 +209,7 @@ export default function SiteConfigPage() {
                     {logoInput && (
                       <button
                         onClick={() => setLogoInput('')}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer shrink-0"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-950/20 bg-rose-50 dark:bg-rose-950/15 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/30 transition cursor-pointer shrink-0"
                         title="Hapus Logo"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -221,81 +220,99 @@ export default function SiteConfigPage() {
               </div>
 
               {/* Warna Primer */}
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Warna Primer</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Warna utama sistem & tombol aksen</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Warna Primer</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Warna utama sistem & tombol aksen</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={primaryInput}
-                    onChange={(e) => setPrimaryInput(e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-lg border border-slate-200 outline-none"
-                  />
+                  <div className="relative h-9 w-9 shrink-0">
+                    <input
+                      type="color"
+                      value={primaryInput}
+                      onChange={(e) => setPrimaryInput(e.target.value)}
+                      className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div
+                      style={{ backgroundColor: primaryInput }}
+                      className="h-full w-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition hover:scale-105 active:scale-95"
+                    />
+                  </div>
                   <input
                     type="text"
                     value={primaryInput}
                     onChange={(e) => setPrimaryInput(e.target.value)}
-                    className="w-20 rounded-lg border border-slate-200 bg-white py-1 px-1.5 text-center font-mono text-[10px] font-bold text-slate-600 outline-none focus:border-brand-primary"
+                    className="w-24 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-1.5 text-center font-mono text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-brand-primary"
                   />
                 </div>
               </div>
 
               {/* Warna Sekunder */}
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Warna Sekunder</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Warna latar belakang sidebar utama</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Warna Sekunder</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Warna latar belakang sidebar utama</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={secondaryInput}
-                    onChange={(e) => setSecondaryInput(e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-lg border border-slate-200 outline-none"
-                  />
+                  <div className="relative h-9 w-9 shrink-0">
+                    <input
+                      type="color"
+                      value={secondaryInput}
+                      onChange={(e) => setSecondaryInput(e.target.value)}
+                      className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div
+                      style={{ backgroundColor: secondaryInput }}
+                      className="h-full w-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition hover:scale-105 active:scale-95"
+                    />
+                  </div>
                   <input
                     type="text"
                     value={secondaryInput}
                     onChange={(e) => setSecondaryInput(e.target.value)}
-                    className="w-20 rounded-lg border border-slate-200 bg-white py-1 px-1.5 text-center font-mono text-[10px] font-bold text-slate-600 outline-none focus:border-brand-primary"
+                    className="w-24 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-1.5 text-center font-mono text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-brand-primary"
                   />
                 </div>
               </div>
 
               {/* Warna Navbar */}
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 bg-slate-50/50 p-4 text-left">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-black text-slate-700 uppercase">Warna Navbar</h4>
-                  <p className="text-[10px] font-medium text-slate-400">Header navigasi atas aplikasi</p>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Warna Navbar</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Header navigasi atas aplikasi</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={navbarInput}
-                    onChange={(e) => setNavbarInput(e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-lg border border-slate-200 outline-none"
-                  />
+                  <div className="relative h-9 w-9 shrink-0">
+                    <input
+                      type="color"
+                      value={navbarInput}
+                      onChange={(e) => setNavbarInput(e.target.value)}
+                      className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div
+                      style={{ backgroundColor: navbarInput }}
+                      className="h-full w-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition hover:scale-105 active:scale-95"
+                    />
+                  </div>
                   <input
                     type="text"
                     value={navbarInput}
                     onChange={(e) => setNavbarInput(e.target.value)}
-                    className="w-20 rounded-lg border border-slate-200 bg-white py-1 px-1.5 text-center font-mono text-[10px] font-bold text-slate-600 outline-none focus:border-brand-primary"
+                    className="w-24 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-1.5 text-center font-mono text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-brand-primary"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 pt-4 border-t border-slate-100 space-y-3">
+          <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
             {successMsg && (
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700 text-left">
+              <div className="rounded-xl border border-emerald-100 dark:border-emerald-950/30 bg-emerald-50 dark:bg-emerald-950/20 p-3 text-xs font-bold text-emerald-700 dark:text-emerald-450 text-left">
                 {successMsg}
               </div>
             )}
             {errorMsg && (
-              <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs font-bold text-rose-700 text-left">
+              <div className="rounded-xl border border-rose-100 dark:border-rose-950/30 bg-rose-50 dark:bg-rose-950/20 p-3 text-xs font-bold text-rose-700 dark:text-rose-455 text-left">
                 {errorMsg}
               </div>
             )}
@@ -304,12 +321,12 @@ export default function SiteConfigPage() {
               <button
                 onClick={handleResetToDefault}
                 disabled={isSaving}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-3 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-750 py-3 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Reset</span>
               </button>
-              
+
               <button
                 onClick={handleSave}
                 disabled={isSaving}
@@ -324,14 +341,14 @@ export default function SiteConfigPage() {
         </div>
 
         {/* Live Layout Preview Mockup */}
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-7">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-6">
-            <Layout className="h-4.5 w-4.5 text-slate-400" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-600">Preview Layout Real-time</span>
+        <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm lg:col-span-7">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+            <Layout className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500" />
+            <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-350">Preview Layout Real-time</span>
           </div>
 
           {/* Interactive Layout Mockup */}
-          <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-inner bg-slate-100 flex aspect-video w-full select-none">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-inner bg-slate-100 dark:bg-slate-950 flex aspect-video w-full select-none">
             {/* Sidebar Mock */}
             <div
               style={{
@@ -350,7 +367,7 @@ export default function SiteConfigPage() {
                   </div>
                   <span className="text-[7px] font-black uppercase tracking-wide truncate">{titleInput || 'PT. SUGITY'}</span>
                 </div>
-                
+
                 <div className="space-y-1">
                   <div className="rounded bg-white/20 px-2 py-1 text-[6px] font-black uppercase tracking-wider">Dashboard</div>
                   <div className="rounded px-2 py-1 text-[6px] font-black uppercase tracking-wider opacity-60">Orders</div>
@@ -364,7 +381,7 @@ export default function SiteConfigPage() {
             </div>
 
             {/* Content Mock */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-100 dark:bg-slate-950 transition-colors duration-300">
               {/* Navbar Mock */}
               <div
                 style={{ backgroundColor: navbarInput }}
@@ -380,28 +397,28 @@ export default function SiteConfigPage() {
               {/* Body Mock */}
               <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg bg-white border border-slate-200 p-2 shadow-sm text-left">
-                    <div className="text-[5px] font-black text-slate-400 uppercase">Target</div>
-                    <div className="text-[10px] font-black text-slate-700 mt-0.5">2,540 Pcs</div>
+                  <div className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 shadow-sm text-left transition-colors duration-300">
+                    <div className="text-[5px] font-black text-slate-400 dark:text-slate-500 uppercase">Target</div>
+                    <div className="text-[10px] font-black text-slate-700 dark:text-slate-250 mt-0.5">2,540 Pcs</div>
                   </div>
-                  <div className="rounded-lg bg-white border border-slate-200 p-2 shadow-sm text-left">
-                    <div className="text-[5px] font-black text-slate-400 uppercase">Aktual</div>
-                    <div className="text-[10px] font-black text-slate-700 mt-0.5">2,410 Pcs</div>
+                  <div className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 shadow-sm text-left transition-colors duration-300">
+                    <div className="text-[5px] font-black text-slate-400 dark:text-slate-500 uppercase">Aktual</div>
+                    <div className="text-[10px] font-black text-slate-700 dark:text-slate-250 mt-0.5">2,410 Pcs</div>
                   </div>
-                  <div className="rounded-lg bg-white border border-slate-200 p-2 shadow-sm text-left">
-                    <div className="text-[5px] font-black text-slate-400 uppercase">Efisiensi</div>
+                  <div className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 shadow-sm text-left transition-colors duration-300">
+                    <div className="text-[5px] font-black text-slate-400 dark:text-slate-500 uppercase">Efisiensi</div>
                     <div className="text-[10px] font-black text-emerald-600 mt-0.5">94.8%</div>
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm text-left space-y-1.5">
+                <div className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-sm text-left space-y-1.5 transition-colors duration-300">
                   <div className="flex items-center justify-between">
-                    <span className="text-[6px] font-black text-slate-700 uppercase">Monitoring Real-time Mesin</span>
+                    <span className="text-[6px] font-black text-slate-700 dark:text-slate-250 uppercase">Monitoring Real-time Mesin</span>
                     <span className="text-[5px] font-extrabold text-[#008d51] uppercase flex items-center gap-0.5">
                       <span className="h-1 w-1 rounded-full bg-emerald-500 animate-ping" /> Normal
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden transition-colors duration-300">
                     <div style={{ backgroundColor: primaryInput }} className="h-full w-4/5 rounded-full transition-all duration-300" />
                   </div>
                 </div>

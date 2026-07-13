@@ -1,4 +1,4 @@
-import { Menu, LogOut, User } from 'lucide-react';
+import { Menu, LogOut, User, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 
@@ -13,6 +13,8 @@ export default function Navbar({ onToggleSidebar, title }: NavbarProps) {
   const activePortal = useAuthStore((state) => state.activePortal);
   const logoutDevice = useAuthStore((state) => state.logoutDevice);
   const colorNavbar = useThemeStore((state) => state.colorNavbar);
+  const darkMode = useThemeStore((state) => state.darkMode);
+  const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
 
   return (
     <header 
@@ -46,6 +48,15 @@ export default function Navbar({ onToggleSidebar, title }: NavbarProps) {
             </div>
           </div>
         )}
+
+        {/* Dark Mode Toggle */}
+        <button
+          onClick={toggleDarkMode}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-all cursor-pointer border border-white/10"
+          title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {darkMode ? <Sun className="h-4 w-4 text-amber-300" /> : <Moon className="h-4 w-4 text-slate-100" />}
+        </button>
 
         <button
           onClick={logoutDevice}

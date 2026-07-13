@@ -161,21 +161,21 @@ export default function GlobalLogsPage() {
 
   // Helper to color-code HTTP status badge
   const getStatusBadgeClass = (code: number | null) => {
-    if (!code) return 'bg-slate-100 text-slate-600';
-    if (code >= 200 && code < 300) return 'bg-emerald-50 border border-emerald-100 text-emerald-700';
-    if (code >= 300 && code < 400) return 'bg-sky-50 border border-sky-100 text-sky-700';
-    if (code >= 400 && code < 500) return 'bg-amber-50 border border-amber-100 text-amber-700';
-    return 'bg-rose-50 border border-rose-100 text-rose-700';
+    if (!code) return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
+    if (code >= 200 && code < 300) return 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400';
+    if (code >= 300 && code < 400) return 'bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 text-sky-700 dark:text-sky-400';
+    if (code >= 400 && code < 500) return 'bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50 text-amber-700 dark:text-amber-400';
+    return 'bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/50 text-rose-700 dark:text-rose-400';
   };
 
   // Helper to color-code HTTP request methods
   const getMethodBadgeClass = (method: string) => {
     switch (method.toUpperCase()) {
-      case 'GET': return 'bg-blue-50 text-blue-700 border border-blue-100';
-      case 'POST': return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
-      case 'PUT': return 'bg-amber-50 text-amber-700 border border-amber-100';
-      case 'DELETE': return 'bg-rose-50 text-rose-700 border border-rose-100';
-      default: return 'bg-slate-50 text-slate-700 border border-slate-100';
+      case 'GET': return 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50';
+      case 'POST': return 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50';
+      case 'PUT': return 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50';
+      case 'DELETE': return 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50';
+      default: return 'bg-slate-50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-350 border border-slate-100 dark:border-slate-700/50';
     }
   };
 
@@ -185,20 +185,20 @@ export default function GlobalLogsPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="text-left">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-black uppercase tracking-wider text-slate-400">Security Audit Trail</p>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-white">Security Audit Trail</p>
             {page === 1 && (
-              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100 animate-pulse">
+              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30 animate-pulse">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Live
               </span>
             )}
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 mt-0.5">Sistem Audit Logs</h2>
+          <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 dark:text-slate-100 mt-0.5">Sistem Audit Logs</h2>
         </div>
 
         <button
           onClick={() => setShowClearModal(true)}
-          className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-100 transition hover:bg-rose-700 active:scale-95 cursor-pointer shrink-0"
+          className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-100 dark:shadow-none transition hover:bg-rose-700 active:scale-95 cursor-pointer shrink-0"
         >
           <Trash2 className="h-4 w-4" />
           <span>Hapus Semua Logs</span>
@@ -206,17 +206,17 @@ export default function GlobalLogsPage() {
       </div>
 
       {/* Search and Filters grid */}
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-4 mb-4">
-          <Filter className="h-4 w-4 text-slate-400" />
-          <span className="text-xs font-black uppercase tracking-wider text-slate-600">Filter Pencarian</span>
+      <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
+        <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
+          <Filter className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+          <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-white">Filter Pencarian</span>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1 text-left">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Username</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Username</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
                 <Search className="h-3.5 w-3.5" />
               </span>
               <input
@@ -224,15 +224,15 @@ export default function GlobalLogsPage() {
                 value={searchUsername}
                 onChange={(e) => { setSearchUsername(e.target.value); setPage(1); }}
                 placeholder="Cari user..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-primary focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-9 pr-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
               />
             </div>
           </div>
 
           <div className="space-y-1 text-left">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Endpoint Path</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Endpoint Path</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
                 <Search className="h-3.5 w-3.5" />
               </span>
               <input
@@ -240,41 +240,41 @@ export default function GlobalLogsPage() {
                 value={searchEndpoint}
                 onChange={(e) => { setSearchEndpoint(e.target.value); setPage(1); }}
                 placeholder="Cari endpoint..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-primary focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-9 pr-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
               />
             </div>
           </div>
 
           <div className="space-y-1 text-left">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">HTTP Method</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">HTTP Method</label>
             <select
               value={selectedMethod}
               onChange={(e) => { setSelectedMethod(e.target.value); setPage(1); }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-primary focus:bg-white cursor-pointer"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 cursor-pointer"
             >
-              <option value="">Semua Metode</option>
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
+              <option value="" className="dark:bg-slate-900">Semua Metode</option>
+              <option value="GET" className="dark:bg-slate-900">GET</option>
+              <option value="POST" className="dark:bg-slate-900">POST</option>
+              <option value="PUT" className="dark:bg-slate-900">PUT</option>
+              <option value="DELETE" className="dark:bg-slate-900">DELETE</option>
             </select>
           </div>
 
           <div className="space-y-1 text-left">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status Code</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Status Code</label>
             <input
               type="number"
               value={searchStatusCode}
               onChange={(e) => { setSearchStatusCode(e.target.value); setPage(1); }}
               placeholder="e.g. 200"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-primary focus:bg-white"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
             />
           </div>
 
           <div className="flex items-end">
             <button
               onClick={handleResetFilters}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
               <span>Reset Filter</span>
@@ -284,11 +284,11 @@ export default function GlobalLogsPage() {
       </div>
 
       {/* Logs Table */}
-      <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">
                 <th className="px-6 py-4">Waktu</th>
                 <th className="px-6 py-4">User / Role</th>
                 <th className="px-6 py-4">Metode</th>
@@ -298,19 +298,19 @@ export default function GlobalLogsPage() {
                 <th className="px-6 py-4 text-right">Durasi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-700 dark:text-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-primary"></div>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 dark:border-slate-700 border-t-brand-primary"></div>
                       <span>Memuat log data...</span>
                     </div>
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
                     Tidak ada log audit yang sesuai dengan filter.
                   </td>
                 </tr>
@@ -320,23 +320,22 @@ export default function GlobalLogsPage() {
                     key={log.id} 
                     className={`transition-all duration-500 ${
                       newLogIds.has(log.id) 
-                        ? 'bg-emerald-50 border-l-4 border-l-emerald-500' 
-                        : 'hover:bg-slate-50/50'
-                    }`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500">
+                        ? 'bg-emerald-50/65 dark:bg-emerald-950/20 border-l-4 border-l-emerald-500' 
+                        : 'hover:bg-slate-50/50 dark:hover:bg-slate-850/20'
+                    }`}>
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-500 dark:text-white">
                       {format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {log.username ? (
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-extrabold text-slate-800">{log.username}</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                          <span className="font-extrabold text-slate-800 dark:text-white">{log.username}</span>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 dark:text-white">
                             {log.role}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">SYSTEM / GUEST</span>
+                        <span className="text-slate-400 dark:text-white italic">SYSTEM / GUEST</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -344,10 +343,10 @@ export default function GlobalLogsPage() {
                         {log.method}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 break-all max-w-[250px]">
+                    <td className="px-6 py-4 font-mono text-[11px] text-slate-800 dark:text-white break-all max-w-[250px]">
                       {log.endpoint}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                    <td className="px-6 py-4 whitespace-nowrap font-mono text-[11px] text-slate-500 dark:text-white">
                       {log.ip_address}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -355,7 +354,7 @@ export default function GlobalLogsPage() {
                         {log.status_code || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono text-slate-500 dark:text-white">
                       {log.response_ms ? `${log.response_ms} ms` : '-'}
                     </td>
                   </tr>
@@ -367,29 +366,29 @@ export default function GlobalLogsPage() {
 
         {/* Pagination controls */}
         {meta.total_pages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-            <div className="text-xs font-bold text-slate-500">
-              Menampilkan {logs.length} dari <span className="font-extrabold text-slate-800">{meta.total}</span> logs
+          <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-6 py-4">
+            <div className="text-xs font-bold text-slate-500 dark:text-white">
+              Menampilkan {logs.length} dari <span className="font-extrabold text-slate-800 dark:text-white">{meta.total}</span> logs
             </div>
             
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-white transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                 title="Halaman Sebelumnya"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
 
-              <span className="text-xs font-black text-slate-700">
+              <span className="text-xs font-black text-slate-700 dark:text-white">
                 Halaman {page} dari {meta.total_pages}
               </span>
 
               <button
                 onClick={() => setPage((p) => Math.min(meta.total_pages, p + 1))}
                 disabled={page === meta.total_pages}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-white transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                 title="Halaman Selanjutnya"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -401,13 +400,13 @@ export default function GlobalLogsPage() {
 
       {/* Irreversible Delete Warnings modal overlay */}
       {showClearModal && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 text-center animate-in zoom-in-95 duration-200">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 shadow-inner">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-100 dark:border-slate-800 text-center animate-in zoom-in-95 duration-200">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 shadow-inner">
               <AlertTriangle className="h-7 w-7 animate-bounce" />
             </div>
-            <h3 className="mt-4 text-lg font-black uppercase tracking-wider text-slate-800">Hapus Semua Log?</h3>
-            <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+            <h3 className="mt-4 text-lg font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">Hapus Semua Log?</h3>
+            <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
               Tindakan ini bersifat permanen dan tidak dapat dibatalkan. Seluruh log riwayat audit akan dihapus secara total dari database.
             </p>
 
@@ -415,7 +414,7 @@ export default function GlobalLogsPage() {
               <button
                 onClick={() => setShowClearModal(false)}
                 disabled={isClearing}
-                className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50 cursor-pointer"
+                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Batalkan
               </button>

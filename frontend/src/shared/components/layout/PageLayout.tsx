@@ -15,7 +15,7 @@ export default function PageLayout() {
   const pageTitle = currentItem ? currentItem.label : 'PT. Sugity Creatives';
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
       <OfflineBanner />
 
       {/* Dynamic sidebar */}

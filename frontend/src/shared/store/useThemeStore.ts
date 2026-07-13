@@ -9,6 +9,8 @@ interface ThemeState {
   systemLogo: string;
   browserTitle: string;
   isLoading: boolean;
+  darkMode: boolean;
+  toggleDarkMode: () => void;
   fetchTheme: () => Promise<void>;
   updateTheme: (config: { 
     color_primary?: string; 
@@ -20,24 +22,35 @@ interface ThemeState {
   }) => Promise<void>;
 }
 
-// Apply colors, system title, browser tab title, and system logo dynamically to document and browser tab
+// Apply colors, system title, browser tab title, system logo, and dark mode class to DOM
 const applyThemeToDOM = (primary: string, secondary: string, navbar: string, browserTitle: string, logo: string) => {
   const root = document.documentElement;
   root.style.setProperty('--color-primary', primary);
   root.style.setProperty('--color-secondary', secondary);
   root.style.setProperty('--color-navbar', navbar);
 
+  // Sync dark mode class from localStorage
+  const isDark = localStorage.getItem('sugity_dark_mode') === 'true';
+  if (isDark) {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+
   // Update browser tab title
-  document.title = browserTitle || 'frontend';
+  document.title = browserTitle || 'SC Prod Plan';
 
   // Update browser tab favicon dynamically
   const favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
   if (favicon) {
-    favicon.href = logo || '/favicon.svg';
-    if (logo && logo.startsWith('data:')) {
-      favicon.removeAttribute('type');
-    } else {
+    const finalLogo = logo || '/logo.png';
+    favicon.href = finalLogo;
+    if (finalLogo.endsWith('.png') || finalLogo.startsWith('data:image/png')) {
+      favicon.setAttribute('type', 'image/png');
+    } else if (finalLogo.endsWith('.svg') || finalLogo.startsWith('data:image/svg')) {
       favicon.setAttribute('type', 'image/svg+xml');
+    } else {
+      favicon.removeAttribute('type');
     }
   }
 };
@@ -48,9 +61,27 @@ export const useThemeStore = create<ThemeState>((set) => ({
   colorSecondary: '#E76114',
   colorNavbar: '#037233',
   systemTitle: 'PT. Sugity Creatives',
-  systemLogo: '',
-  browserTitle: 'frontend',
+  systemLogo: '/logo.png',
+  browserTitle: 'SC Prod Plan',
   isLoading: false,
+  darkMode: localStorage.getItem('sugity_dark_mode') === 'true',
+
+  // Toggle dark/light mode and persist to localStorage
+  toggleDarkMode: () => {
+    set((state) => {
+      const newMode = !state.darkMode;
+      localStorage.setItem('sugity_dark_mode', String(newMode));
+      
+      const root = document.documentElement;
+      if (newMode) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      
+      return { darkMode: newMode };
+    });
+  },
 
   // Fetch current site configuration from backend and update styles
   fetchTheme: async () => {
@@ -62,8 +93,8 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const secondary = data.color_secondary || '#E76114';
       const navbar = data.color_navbar || '#037233';
       const title = data.system_title || 'PT. Sugity Creatives';
-      const logo = data.system_logo || '';
-      const bTitle = data.browser_title || 'frontend';
+      const logo = data.system_logo || '/logo.png';
+      const bTitle = data.browser_title || 'SC Prod Plan';
       
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -91,8 +122,8 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const secondary = data.color_secondary || '#E76114';
       const navbar = data.color_navbar || '#037233';
       const title = data.system_title || 'PT. Sugity Creatives';
-      const logo = data.system_logo || '';
-      const bTitle = data.browser_title || 'frontend';
+      const logo = data.system_logo || '/logo.png';
+      const bTitle = data.browser_title || 'SC Prod Plan';
 
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -111,3 +142,6 @@ export const useThemeStore = create<ThemeState>((set) => ({
     }
   },
 }));
+
+// Apply default values immediately to DOM on script execution to prevent lag or flash of default titles
+applyThemeToDOM('#008d51', '#E76114', '#037233', 'SC Prod Plan', '/logo.png');

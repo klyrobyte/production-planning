@@ -11,9 +11,9 @@ import ForbiddenPage from './shared/pages/ForbiddenPage';
 // Inline placeholder for landing dashboard
 function DashboardPlaceholder() {
   return (
-    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
-      <h3 className="text-lg font-bold text-slate-800 uppercase">3M Dashboard</h3>
-      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">3M Dashboard</h3>
+      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
         Selamat datang di Portal Perencanaan Produksi PT. Sugity Creatives. Halaman Dashboard sedang dalam pengembangan.
       </p>
     </div>
@@ -23,9 +23,9 @@ function DashboardPlaceholder() {
 // Inline placeholder for orders management
 function OrdersPlaceholder() {
   return (
-    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
-      <h3 className="text-lg font-bold text-slate-800 uppercase">Orders Management</h3>
-      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Orders Management</h3>
+      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
         Halaman pengimporan order dan mapping conversion sedang dalam pengembangan.
       </p>
     </div>
@@ -35,9 +35,9 @@ function OrdersPlaceholder() {
 // Inline placeholder for production monitoring
 function ProductionPlaceholder() {
   return (
-    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
-      <h3 className="text-lg font-bold text-slate-800 uppercase">Production Control</h3>
-      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Production Control</h3>
+      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
         Halaman visualisasi timeline Heijunka dan monitoring mesin sedang dalam pengembangan.
       </p>
     </div>
@@ -52,9 +52,9 @@ import SiteConfigPage from './features/site-config/pages/SiteConfigPage';
 // Inline placeholder for database management
 function DatabasePlaceholder() {
   return (
-    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 text-left">
-      <h3 className="text-lg font-bold text-slate-800 uppercase">Database Manager</h3>
-      <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Database Manager</h3>
+      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
         Halaman pengelola Master Parts, Mesin, dan PIN Leader sedang dalam pengembangan.
       </p>
     </div>
