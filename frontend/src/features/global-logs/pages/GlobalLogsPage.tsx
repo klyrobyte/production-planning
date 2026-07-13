@@ -48,6 +48,9 @@ export default function GlobalLogsPage() {
   const [isClearing, setIsClearing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Real-time notification highlight states
+  const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
+
   // Fetch logs with active filters and pagination
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -72,6 +75,65 @@ export default function GlobalLogsPage() {
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  // Real-time EventSource connection for Server-Sent Events (SSE)
+  useEffect(() => {
+    if (page !== 1) return;
+
+    // Connect to SSE stream
+    const eventSource = new EventSource('/api/global-logs/stream', { withCredentials: true });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const newLog: LogItem = JSON.parse(event.data);
+
+        // Apply active client-side filters
+        if (searchUsername && !newLog.username?.toLowerCase().includes(searchUsername.toLowerCase())) return;
+        if (searchEndpoint && !newLog.endpoint.toLowerCase().includes(searchEndpoint.toLowerCase())) return;
+        if (selectedMethod && newLog.method.toUpperCase() !== selectedMethod.toUpperCase()) return;
+        if (searchStatusCode && newLog.status_code !== parseInt(searchStatusCode, 10)) return;
+
+        setLogs((prev) => {
+          // Avoid duplicate items
+          if (prev.some((item) => item.id === newLog.id)) return prev;
+
+          // Add to newLogIds to trigger highlights
+          setNewLogIds((prevIds) => {
+            const nextIds = new Set(prevIds);
+            nextIds.add(newLog.id);
+            return nextIds;
+          });
+
+          // Auto-remove highlight after 3 seconds
+          setTimeout(() => {
+            setNewLogIds((prevIds) => {
+              const nextIds = new Set(prevIds);
+              nextIds.delete(newLog.id);
+              return nextIds;
+            });
+          }, 3000);
+
+          return [newLog, ...prev.slice(0, limit - 1)];
+        });
+
+        // Increment total logged request count
+        setMeta((prev) => ({
+          ...prev,
+          total: prev.total + 1,
+        }));
+      } catch (err) {
+        console.error('Error parsing live log event:', err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE connection error:', err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [page, limit, searchUsername, searchEndpoint, selectedMethod, searchStatusCode]);
 
   // Handle clearing all logs database entries
   const handleClearAllLogs = async () => {
@@ -122,7 +184,15 @@ export default function GlobalLogsPage() {
       {/* Top action header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="text-left">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-400">Security Audit Trail</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400">Security Audit Trail</p>
+            {page === 1 && (
+              <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100 animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Live
+              </span>
+            )}
+          </div>
           <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 mt-0.5">Sistem Audit Logs</h2>
         </div>
 
@@ -246,7 +316,14 @@ export default function GlobalLogsPage() {
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/50 transition">
+                  <tr 
+                    key={log.id} 
+                    className={`transition-all duration-500 ${
+                      newLogIds.has(log.id) 
+                        ? 'bg-emerald-50 border-l-4 border-l-emerald-500' 
+                        : 'hover:bg-slate-50/50'
+                    }`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-slate-500">
                       {format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}
                     </td>
