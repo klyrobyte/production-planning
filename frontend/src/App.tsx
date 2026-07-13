@@ -49,19 +49,7 @@ import GlobalLogsPage from './features/global-logs/pages/GlobalLogsPage';
 import SiteConfigPage from './features/site-config/pages/SiteConfigPage';
 import FactoriesPage from './features/factories/pages/FactoriesPage';
 import MachinesPage from './features/machines/pages/MachinesPage';
-
-
-// Inline placeholder for database management
-function DatabasePlaceholder() {
-  return (
-    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
-      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Database Manager</h3>
-      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
-        Halaman pengelola Master Parts, Mesin, dan PIN Leader sedang dalam pengembangan.
-      </p>
-    </div>
-  );
-}
+import DatabasePage from './features/database/pages/DatabasePage';
 // Core App bootstrap layout logic
 function AppContent() {
   const fetchTheme = useThemeStore((state) => state.fetchTheme);
@@ -98,7 +86,9 @@ function AppContent() {
             <Route path="/dashboard" element={<DashboardPlaceholder />} />
             <Route path="/orders" element={<OrdersPlaceholder />} />
             <Route path="/production" element={<ProductionPlaceholder />} />
-            <Route path="/database" element={<DatabasePlaceholder />} />
+            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner']} />}>
+              <Route path="/database" element={<DatabasePage />} />
+            </Route>
             
             <Route element={<ProtectedRoute allowedRoles={['super-admin']} />}>
               <Route path="/users" element={<UsersPage />} />
