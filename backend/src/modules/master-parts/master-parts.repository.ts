@@ -31,7 +31,13 @@ export const masterPartsRepository = {
         daily_requirement_n3 = EXCLUDED.daily_requirement_n3, month_n_forecast = EXCLUDED.month_n_forecast,
         month_n1_forecast = EXCLUDED.month_n1_forecast, month_n2_forecast = EXCLUDED.month_n2_forecast,
         month_n3_forecast = EXCLUDED.month_n3_forecast, monthly_forecasts = EXCLUDED.monthly_forecasts,
-        customer = EXCLUDED.customer, spec = EXCLUDED.spec
+        customer = EXCLUDED.customer, spec = EXCLUDED.spec,
+        sebango = EXCLUDED.sebango, material = EXCLUDED.material,
+        area = EXCLUDED.area, tonnage = EXCLUDED.tonnage,
+        cavity = EXCLUDED.cavity, mold = EXCLUDED.mold,
+        weight = EXCLUDED.weight, process = EXCLUDED.process,
+        shikake = EXCLUDED.shikake, customer_pno = EXCLUDED.customer_pno,
+        customer_sebango = EXCLUDED.customer_sebango, seq_no = EXCLUDED.seq_no
        RETURNING *`,
       [
         data.part_number, data.part_name, data.home_line, data.backup_line, data.model, data.cycle_time,
