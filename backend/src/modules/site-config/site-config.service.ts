@@ -30,7 +30,12 @@ export async function patchConfig(
   for (const key of ALLOWED_CONFIG_KEYS) {
     if (key in input) {
       const value = input[key];
-      if (typeof value !== 'string' || !HEX_COLOR_REGEX.test(value)) {
+      if (typeof value !== 'string') {
+        throw new AppError(400, 'VALIDATION_ERROR', `Nilai untuk "${key}" harus berupa string.`);
+      }
+
+      const isColorKey = ['color_primary', 'color_secondary', 'color_navbar'].includes(key);
+      if (isColorKey && !HEX_COLOR_REGEX.test(value)) {
         throw new AppError(
           400,
           'VALIDATION_ERROR',
