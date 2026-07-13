@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../rbac/rbac.middleware';
-import { handleGetLogs, handleDeleteLogs } from './global-logs.controller';
+import { handleGetLogs, handleDeleteLogs, handleStreamLogs } from './global-logs.controller';
 
 export const globalLogsRoutes = Router();
 
@@ -10,6 +10,22 @@ export const globalLogsRoutes = Router();
  *   name: GlobalLogs
  *   description: Audit trail semua API request — akses eksklusif super-admin
  */
+
+/**
+ * @swagger
+ * /api/global-logs/stream:
+ *   get:
+ *     summary: Stream audit logs real-time menggunakan Server-Sent Events (SSE)
+ *     tags: [GlobalLogs]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Event-stream channel established successfully
+ *       403:
+ *         description: Bukan super-admin
+ */
+globalLogsRoutes.get('/stream', requireAuth, requireRole('super-admin'), handleStreamLogs);
 
 /**
  * @swagger

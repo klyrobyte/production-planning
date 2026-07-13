@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../config/database';
+import { auditLogEmitter } from '../events/audit-log.emitter';
 
 // Paths excluded from audit logging — too noisy or non-user-driven
 const EXCLUDED_PREFIXES = ['/health', '/api/docs'];
@@ -15,8 +16,10 @@ const EXCLUDED_PREFIXES = ['/health', '/api/docs'];
  * write failure NEVER crashes the server or adds latency to the response.
  */
 export function auditLogMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const endpoint = req.originalUrl.split('?')[0];
+
   // Skip excluded paths immediately
-  const shouldSkip = EXCLUDED_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+  const shouldSkip = EXCLUDED_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
   if (shouldSkip) {
     next();
     return;
@@ -41,9 +44,16 @@ export function auditLogMiddleware(req: Request, res: Response, next: NextFuncti
       .query(
         `INSERT INTO global_logs
            (username, role, method, endpoint, ip_address, status_code, response_ms)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [username, role, req.method, req.path, ipAddress, res.statusCode, responseMs],
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, timestamp, username, role, method, endpoint, ip_address, status_code, response_ms`,
+        [username, role, req.method, endpoint, ipAddress, res.statusCode, responseMs],
       )
+      .then((result) => {
+        const newLog = result.rows[0];
+        if (newLog) {
+          auditLogEmitter.emit('new-log', newLog);
+        }
+      })
       .catch((err: unknown) => {
         // Log to console only — never throw
         console.error('[AuditLog] Failed to write log entry:', err);
