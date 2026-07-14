@@ -20,17 +20,7 @@ function DashboardPlaceholder() {
   );
 }
 
-// Inline placeholder for orders management
-function OrdersPlaceholder() {
-  return (
-    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
-      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Orders Management</h3>
-      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
-        Halaman pengimporan order dan mapping conversion sedang dalam pengembangan.
-      </p>
-    </div>
-  );
-}
+
 
 // Inline placeholder for production monitoring
 function ProductionPlaceholder() {
@@ -50,6 +40,8 @@ import SiteConfigPage from './features/site-config/pages/SiteConfigPage';
 import FactoriesPage from './features/factories/pages/FactoriesPage';
 import MachinesPage from './features/machines/pages/MachinesPage';
 import DatabasePage from './features/database/pages/DatabasePage';
+import OrdersPage from './features/orders/pages/OrdersPage';
+
 // Core App bootstrap layout logic
 function AppContent() {
   const fetchTheme = useThemeStore((state) => state.fetchTheme);
@@ -84,7 +76,7 @@ function AppContent() {
         <Route element={<ProtectedRoute />}>
           <Route element={<PageLayout />}>
             <Route path="/dashboard" element={<DashboardPlaceholder />} />
-            <Route path="/orders" element={<OrdersPlaceholder />} />
+            <Route path="/orders" element={<OrdersPage />} />
             <Route path="/production" element={<ProductionPlaceholder />} />
             <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner']} />}>
               <Route path="/database" element={<DatabasePage />} />
