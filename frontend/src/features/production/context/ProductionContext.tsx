@@ -1,0 +1,1034 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import api from '../../../shared/lib/axios';
+import { initSocket } from '../../../shared/lib/socket';
+
+export type JobStatus = 'completed' | 'dandori' | 'running' | 'queued';
+
+export interface Job {
+  id: string;
+  seq: number;
+  customer: string;
+  model: string;
+  partName: string;
+  qtyDay: number;
+  qtyLot: number;
+  actualQty: number;
+  mold: string;
+  material: string;
+  kav: number;
+  ct: number;
+  spec?: number;
+  dandori: number;
+  time: number;
+  status: JobStatus;
+  timeRange: string;
+  dandoriTimeRange?: string;
+  shift: 'day' | 'night' | 'overflow';
+  spansOffHours?: boolean;
+  triggerTime?: string;
+  eta?: string;
+  actualDandoriStart?: string;
+  actualDandoriEnd?: string;
+  actualProductionStart?: string;
+  actualProductionEnd?: string;
+  downtimeMinutes?: number;
+  closedNgQty?: number;
+  closedOkQty?: number;
+}
+
+export interface AbnormalityLog {
+  id: string;
+  machineId: string;
+  date: string;
+  time: string;
+  type: string;
+  message: string;
+}
+
+export interface ActiveAbnormality {
+  isAbnormal: boolean;
+  type: string;
+  start: string;
+}
+
+export interface ActiveNg {
+  isNg: boolean;
+  type: string;
+  start: string;
+}
+
+interface ProductionContextType {
+  machineJobs: Record<string, Job[]>;
+  logs: Record<string, AbnormalityLog[]>;
+  dayOTs: Record<string, string>;
+  nightOTs: Record<string, string>;
+  activeAbnormalities: Record<string, ActiveAbnormality>;
+  activeNgs: Record<string, ActiveNg>;
+  isLoading: boolean;
+  errorMsg: string | null;
+  fetchPlans: () => Promise<void>;
+  initializeMachineIfEmpty: (machineId: string, dateStr: string, parts: any[]) => void;
+  incrementJobProgress: (machineId: string, jobId: string, qty: number, dateStr: string, parts: any[], logMessage?: { type: string; note: string }) => void;
+  updateJobStatus: (machineId: string, jobId: string, action: 'complete-running' | 'complete-dandori', dateStr: string, parts: any[], logMessage?: { type: string; note: string }, closedNgQty?: number, closedOkQty?: number) => void;
+  closeShiftProduction: (machineId: string, shift: 'day' | 'night', dateStr: string) => void;
+  addJobDowntime: (machineId: string, jobId: string, downtimeMins: number, dateStr: string, parts: any[], logMessage?: { type: string; note: string }) => void;
+  setMachineAbnormal: (machineId: string, isAbnormal: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }, downtimeMins?: number, downtimeJobId?: string) => void;
+  setMachineNg: (machineId: string, isNg: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }) => void;
+  reorderMachineJobs: (machineId: string, jobs: Job[], dateStr: string) => void;
+}
+
+const ProductionContext = createContext<ProductionContextType | undefined>(undefined);
+
+// Calculates working hours blocks based on Sugity shift patterns
+function getWorkingBlocks() {
+  const blocks: [number, number][] = [];
+  blocks.push([435, 570]);
+  blocks.push([580, 715]);
+  blocks.push([755, 965]);
+  blocks.push([980, 1140]);
+  blocks.push([1260, 1440]);
+  blocks.push([0, 60]);
+  blocks.push([100, 280]);
+  blocks.push([295, 435]);
+  blocks.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const block of blocks) {
+    if (merged.length === 0) {
+      merged.push([...block]);
+    } else {
+      const last = merged[merged.length - 1];
+      if (block[0] <= last[1]) {
+        last[1] = Math.max(last[1], block[1]);
+      } else {
+        merged.push([...block]);
+      }
+    }
+  }
+  return merged;
+}
+
+// Adds working minutes to a Date object while skipping off hours and breaks
+export function addWorkingMinutes(current: Date, minutesToAdd: number): Date {
+  const result = new Date(current);
+  let remaining = minutesToAdd;
+  let iterations = 0;
+  while (remaining > 0 && iterations < 100) {
+    iterations++;
+    const blocks = getWorkingBlocks();
+    const timeInMins = result.getHours() * 60 + result.getMinutes() + result.getSeconds() / 60;
+    let foundBlock = false;
+    for (const block of blocks) {
+      if (timeInMins >= block[0] && timeInMins < block[1]) {
+        const available = block[1] - timeInMins;
+        if (remaining <= available) {
+          result.setMinutes(result.getMinutes() + remaining);
+          remaining = 0;
+          foundBlock = true;
+          break;
+        } else {
+          remaining -= available;
+          result.setHours(Math.floor(block[1] / 60), block[1] % 60, 0, 0);
+          foundBlock = true;
+          break;
+        }
+      } else if (timeInMins < block[0]) {
+        result.setHours(Math.floor(block[0] / 60), block[0] % 60, 0, 0);
+        foundBlock = true;
+        break;
+      }
+    }
+    if (!foundBlock) {
+      result.setDate(result.getDate() + 1);
+      result.setHours(0, 0, 0, 0);
+    }
+  }
+  return result;
+}
+
+// Recalculates the timing fields of the scheduled jobs timeline
+const recalculateTimelineHelper = (items: Job[]): Job[] => {
+  const firstDayIdx = items.findIndex(item => item.shift === 'day');
+  const firstNightIdx = items.findIndex(item => item.shift === 'night');
+  const dayStart = new Date();
+  dayStart.setHours(7, 15, 0, 0);
+  const nightPrepStart = new Date(dayStart);
+  nightPrepStart.setHours(21, 0, 0, 0);
+  let lastDayEndTime = new Date(dayStart);
+  lastDayEndTime.setMinutes(lastDayEndTime.getMinutes() + 15);
+  let lastNightEndTime = new Date(nightPrepStart);
+  lastNightEndTime.setMinutes(lastNightEndTime.getMinutes() + 10);
+  let isFirstNight = true;
+  return items.map((item, index) => {
+    const jobShift = item.shift || 'day';
+    let jobStartClock = new Date();
+    if (jobShift === 'day') {
+      jobStartClock = new Date(lastDayEndTime);
+    } else if (jobShift === 'night') {
+      if (isFirstNight) {
+        let nightStart = new Date(nightPrepStart);
+        if (lastDayEndTime.getTime() > nightStart.getTime()) {
+          nightStart = new Date(lastDayEndTime);
+        }
+        jobStartClock = new Date(nightStart);
+        jobStartClock.setMinutes(jobStartClock.getMinutes() + 10);
+        isFirstNight = false;
+      } else {
+        jobStartClock = new Date(lastNightEndTime);
+      }
+    } else {
+      jobStartClock = new Date(lastNightEndTime);
+    }
+    const startStr = jobStartClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const startTimeStamp = jobStartClock.getTime();
+    const endJobClock = addWorkingMinutes(jobStartClock, item.time);
+    const endStr = endJobClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const endTimeStamp = endJobClock.getTime();
+    const actualDandori = item.dandori !== undefined ? item.dandori : 15;
+    let dandoriStartStr = '';
+    let dandoriEndStr = '';
+    let dandoriRangeStr = '';
+    let runningClock = new Date(endJobClock);
+    if (actualDandori > 0 && jobShift !== 'overflow') {
+      const dandoriStartClock = new Date(endJobClock);
+      const dandoriEndClock = addWorkingMinutes(dandoriStartClock, actualDandori);
+      dandoriStartStr = dandoriStartClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      dandoriEndStr = dandoriEndClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      dandoriRangeStr = `${endStr} - ${dandoriEndStr}`;
+      runningClock = dandoriEndClock;
+    }
+    if (jobShift === 'day') {
+      lastDayEndTime = new Date(runningClock);
+    } else {
+      lastNightEndTime = new Date(runningClock);
+    }
+    const elapsedMins = Math.round((endTimeStamp - startTimeStamp) / 60000);
+    const spansOffHours = elapsedMins > item.time;
+    let status = item.status;
+    if (status !== 'completed' && status !== 'running') {
+      if (index === firstDayIdx || index === firstNightIdx) {
+        status = 'dandori';
+      } else if (index > 0 && items[index - 1].status === 'completed') {
+        status = 'dandori';
+      } else {
+        status = 'queued';
+      }
+    }
+    let actualDandoriStart = item.actualDandoriStart;
+    let actualDandoriEnd = item.actualDandoriEnd;
+    let actualProductionStart = item.actualProductionStart;
+    let actualProductionEnd = item.actualProductionEnd;
+    if (status === 'queued') {
+      actualDandoriStart = undefined;
+      actualDandoriEnd = undefined;
+      actualProductionStart = undefined;
+      actualProductionEnd = undefined;
+    } else if (status === 'dandori' && !actualDandoriStart) {
+      actualDandoriStart = jobShift === 'night' ? '21:00' : '07:15';
+    }
+    if (status === 'running') {
+      if (!actualDandoriStart) {
+        actualDandoriStart = jobShift === 'night' ? '21:00' : '07:15';
+      }
+      if (!actualDandoriEnd) {
+        actualDandoriEnd = actualProductionStart || (jobShift === 'night' ? '21:10' : '07:30');
+      }
+      if (!actualProductionStart) {
+        actualProductionStart = actualDandoriEnd;
+      }
+    }
+    if (status === 'completed') {
+      if (!actualDandoriStart) {
+        actualDandoriStart = jobShift === 'night' ? '21:00' : '07:15';
+      }
+      if (!actualDandoriEnd) {
+        actualDandoriEnd = jobShift === 'night' ? '21:10' : '07:30';
+      }
+      if (!actualProductionStart) {
+        actualProductionStart = actualDandoriEnd;
+      }
+      if (!actualProductionEnd) {
+        const [shStr, smStr] = actualProductionStart.split(':');
+        const sh = parseInt(shStr, 10);
+        const sm = parseInt(smStr, 10);
+        const startClock = new Date();
+        startClock.setHours(sh, sm, 0, 0);
+        const endClock = new Date(startClock.getTime() + item.time * 60000);
+        actualProductionEnd = endClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    return {
+      ...item,
+      seq: index + 1,
+      timeRange: `${startStr} - ${endStr}`,
+      dandoriTimeRange: dandoriRangeStr,
+      shift: jobShift,
+      dandori: actualDandori,
+      status,
+      spansOffHours,
+      actualDandoriStart,
+      actualDandoriEnd,
+      actualProductionStart,
+      actualProductionEnd
+    };
+  });
+};
+
+// Normalizes machine codes for identification matching
+export const normalizeLineName = (line: string): string => {
+  if (!line) return '';
+  return line.trim().toUpperCase().replace(/\s+/g, '').replace(/#/g, '').replace(/MC/g, '').replace(/-?\d+T$/g, '');
+};
+
+// Parses machine identifier details to separate factory and code
+export const parseMachineIdentifier = (str: string) => {
+  if (!str) return { factory: 'UNKNOWN', machine: '' };
+  const upper = str.toUpperCase().replace(/\s+/g, '');
+  let factory = 'UNKNOWN';
+  if (upper.includes('FACT2') || upper.includes('F2') || upper.includes('FACTORY2')) {
+    factory = 'F2';
+  } else if (upper.includes('FACT3') || upper.includes('F3') || upper.includes('FACTORY3')) {
+    factory = 'F3';
+  } else if (upper.includes('FACT4') || upper.includes('F4') || upper.includes('FACTORY4')) {
+    factory = 'F4';
+  } else if (upper.includes('SC2')) {
+    factory = 'SC2';
+  }
+  const remaining = upper
+    .replace(/FACTORY\s*\d?/g, '')
+    .replace(/FACT\s*\d?/g, '')
+    .replace(/F\s*\d/g, '')
+    .replace(/SC\s*\d?/g, '')
+    .replace(/RESIN/g, '')
+    .replace(/M\/C/g, '')
+    .replace(/MC/g, '')
+    .replace(/MACHINE/g, '')
+    .replace(/#/g, '')
+    .replace(/-?\d+T$/i, '')
+    .replace(/-/g, '');
+  const match = remaining.match(/([B]?[0-9]+[B]?)/);
+  const machine = match ? match[1] : remaining;
+  return { factory, machine };
+};
+
+// Compares two machine codes to determine if they match the same machine
+export const machinesMatch = (nameA: string, nameB: string): boolean => {
+  const pA = parseMachineIdentifier(nameA);
+  const pB = parseMachineIdentifier(nameB);
+  if (pA.factory === 'UNKNOWN' || pB.factory === 'UNKNOWN') {
+    const normA = normalizeLineName(nameA);
+    const normB = normalizeLineName(nameB);
+    return normA.includes(normB) || normB.includes(normA);
+  }
+  return pA.factory === pB.factory && pA.machine === pB.machine;
+};
+
+// Obtains the calendar month boundaries for forecast mappings
+const getForecastMonthKeys = () => {
+  const now = new Date();
+  const currentMonthIdx = now.getMonth();
+  const currentYear = now.getFullYear();
+  const getKey = (offset: number) => {
+    const targetMonthIdx = (currentMonthIdx + offset) % 12;
+    const targetYear = currentYear + Math.floor((currentMonthIdx + offset) / 12);
+    const mm = String(targetMonthIdx + 1).padStart(2, '0');
+    return `${targetYear}-${mm}`;
+  };
+  return {
+    monthN: getKey(0),
+    monthN1: getKey(1),
+    monthN2: getKey(2),
+    monthN3: getKey(3),
+  };
+};
+
+// Builds Leveled Heijunka jobs for a machine based on daily requirement and Shikake counts
+export const getHeijunkaJobsForMachine = (machineId: string, dateStr: string, parts: any[]): Job[] => {
+  if (!parts || !Array.isArray(parts) || parts.length === 0) return [];
+  const machineParts = parts.filter(p => p.home_line && machinesMatch(p.home_line, machineId));
+  if (machineParts.length === 0) return [];
+  const targetMonthKey = dateStr.substring(0, 7);
+  const monthKeys = getForecastMonthKeys();
+  const activeJobs: Job[] = [];
+  const partRuns: Job[][] = machineParts.map((part, pIdx) => {
+    const dbForecasts = part.monthly_forecasts || {};
+    const monthForecast = dbForecasts[targetMonthKey];
+    let qtyDay = 0;
+    if (monthForecast && monthForecast.daily !== undefined) {
+      qtyDay = Number(monthForecast.daily);
+    } else {
+      if (targetMonthKey === monthKeys.monthN) {
+        qtyDay = part.daily_requirement_n !== undefined ? Number(part.daily_requirement_n) : 0;
+      } else if (targetMonthKey === monthKeys.monthN1) {
+        qtyDay = part.daily_requirement_n1 !== undefined ? Number(part.daily_requirement_n1) : 0;
+      } else if (targetMonthKey === monthKeys.monthN2) {
+        qtyDay = part.daily_requirement_n2 !== undefined ? Number(part.daily_requirement_n2) : 0;
+      } else if (targetMonthKey === monthKeys.monthN3) {
+        qtyDay = part.daily_requirement_n3 !== undefined ? Number(part.daily_requirement_n3) : 0;
+      } else {
+        qtyDay = part.daily_requirement_n !== undefined ? Number(part.daily_requirement_n) : 0;
+      }
+    }
+    if (qtyDay <= 0) return [];
+    const runs = part.shikake || 2;
+    const kanban = part.spec && Number(part.spec) > 0 ? Number(part.spec) : 0;
+    const rawQtyLot = qtyDay / runs;
+    const qtyLot = kanban > 0 ? Math.ceil(rawQtyLot / kanban) * kanban : Math.round(rawQtyLot) || 200;
+    const cavity = part.cavity || 1;
+    const ct = part.cycle_time || 60;
+    const runtimeMins = Math.round(((qtyLot / cavity) * ct) / 60);
+    const jobsList: Job[] = [];
+    for (let r = 0; r < runs; r++) {
+      jobsList.push({
+        id: `job-init-${machineId}-${part.part_number || part.sebango || pIdx}-${r}-${dateStr}`,
+        seq: 0,
+        customer: part.customer || 'Unknown',
+        model: part.part_number || part.sebango || '',
+        partName: part.part_name || 'No Name',
+        qtyDay: qtyDay,
+        qtyLot: qtyLot,
+        actualQty: 0,
+        mold: part.mold || 'MOLD-01',
+        material: part.material || 'PP RESIN',
+        kav: cavity,
+        ct: ct,
+        spec: kanban > 0 ? kanban : undefined,
+        dandori: 15,
+        time: runtimeMins,
+        status: 'queued',
+        timeRange: '',
+        shift: r === 0 ? 'day' : 'night',
+      });
+    }
+    return jobsList;
+  }).filter(runs => runs.length > 0);
+  let hasMore = true;
+  let iteration = 0;
+  while (hasMore) {
+    hasMore = false;
+    for (let pIdx = 0; pIdx < partRuns.length; pIdx++) {
+      if (iteration < partRuns[pIdx].length) {
+        activeJobs.push(partRuns[pIdx][iteration]);
+        hasMore = true;
+      }
+    }
+    iteration++;
+  }
+  const sortedJobs: Job[] = [
+    ...activeJobs.filter(j => j.shift === 'day'),
+    ...activeJobs.filter(j => j.shift === 'night'),
+    ...activeJobs.filter(j => j.shift === 'overflow')
+  ];
+  if (sortedJobs.length > 0) {
+    sortedJobs.forEach((job, idx) => {
+      job.seq = idx + 1;
+      job.dandori = job.dandori !== undefined ? job.dandori : 15;
+    });
+  }
+  return recalculateTimelineHelper(sortedJobs);
+};
+
+// Resolves the current production date according to the 07:00 shift boundary
+export const getTodayDateString = () => {
+  const d = new Date();
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  const currentMins = hours * 60 + minutes;
+  if (currentMins < 420) {
+    d.setDate(d.getDate() - 1);
+  }
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Exposes the context state and synchronization helpers for production telemetry
+export function ProductionProvider({ children }: { children: React.ReactNode }) {
+  const [machineJobs, setMachineJobs] = useState<Record<string, Job[]>>({});
+  const [logs, setLogs] = useState<Record<string, AbnormalityLog[]>>({});
+  const [dayOTs, setDayOTs] = useState<Record<string, string>>({});
+  const [nightOTs, setNightOTs] = useState<Record<string, string>>({});
+  const [activeAbnormalities, setActiveAbnormalities] = useState<Record<string, ActiveAbnormality>>({});
+  const [activeNgs, setActiveNgs] = useState<Record<string, ActiveNg>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const lastLocalWriteRef = useRef<Record<string, number>>({});
+  const logsRef = useRef(logs);
+  useEffect(() => {
+    logsRef.current = logs;
+  }, [logs]);
+
+  // Saves a production plan record into PostgreSQL database via the API
+  const savePlanToDatabase = async (
+    id: string,
+    planType: 'daily' | 'avg',
+    machineId: string,
+    dateKey: string,
+    jobs: Job[],
+    dayOT?: string,
+    nightOT?: string,
+    logsArray?: AbnormalityLog[],
+    isAbnormal?: boolean,
+    abnormalType?: string,
+    abnormalStart?: string,
+    isNg?: boolean,
+    ngType?: string,
+    ngStart?: string
+  ) => {
+    try {
+      const currentAbnormal = activeAbnormalities[id] || { isAbnormal: false, type: '', start: '' };
+      const currentNg = activeNgs[id] || { isNg: false, type: '', start: '' };
+      const payload = {
+        id,
+        plan_type: planType,
+        machine_id: machineId,
+        date_key: dateKey,
+        jobs,
+        day_ot: dayOT || 'teiji',
+        night_ot: nightOT || 'teiji',
+        logs: logsArray || [],
+        is_abnormal: isAbnormal !== undefined ? isAbnormal : currentAbnormal.isAbnormal,
+        abnormal_type: abnormalType !== undefined ? abnormalType : currentAbnormal.type,
+        abnormal_start: abnormalStart !== undefined ? abnormalStart : currentAbnormal.start,
+        is_ng: isNg !== undefined ? isNg : currentNg.isNg,
+        ng_type: ngType !== undefined ? ngType : currentNg.type,
+        ng_start: ngStart !== undefined ? ngStart : currentNg.start
+      };
+      await api.post('/production-plans', payload);
+    } catch (e) {
+      console.error(`Error saving plan ${id} to database:`, e);
+    }
+  };
+
+  // Queries all active plans from Express server to populate layout state
+  const fetchPlans = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get('/production-plans');
+      const loadedJobs: Record<string, Job[]> = {};
+      const loadedDayOTs: Record<string, string> = {};
+      const loadedNightOTs: Record<string, string> = {};
+      const loadedAbnormalities: Record<string, ActiveAbnormality> = {};
+      const loadedNgs: Record<string, ActiveNg> = {};
+      const loadedLogs: Record<string, AbnormalityLog[]> = {};
+      if (response.data?.status === 'ok') {
+        const rows = response.data.data || [];
+        rows.forEach((row: any) => {
+          if (row.plan_type === 'daily') {
+            loadedJobs[row.id] = row.jobs || [];
+          }
+          if (row.day_ot) loadedDayOTs[row.id] = row.day_ot;
+          if (row.night_ot) loadedNightOTs[row.id] = row.night_ot;
+          if (row.logs) loadedLogs[row.id] = row.logs;
+          loadedAbnormalities[row.id] = {
+            isAbnormal: !!row.is_abnormal,
+            type: row.abnormal_type || '',
+            start: row.abnormal_start || ''
+          };
+          loadedNgs[row.id] = {
+            isNg: !!row.is_ng,
+            type: row.ng_type || '',
+            start: row.ng_start || ''
+          };
+        });
+      }
+      const filterStateByLockout = <T,>(prev: Record<string, T>, loaded: Record<string, T>): Record<string, T> => {
+        const next = { ...prev };
+        Object.keys(loaded).forEach(key => {
+          const lastWrite = lastLocalWriteRef.current[key];
+          if (!lastWrite || Date.now() - lastWrite >= 5000) {
+            next[key] = loaded[key];
+          }
+        });
+        return next;
+      };
+      setMachineJobs(prev => filterStateByLockout(prev, loadedJobs));
+      setDayOTs(prev => filterStateByLockout(prev, loadedDayOTs));
+      setNightOTs(prev => filterStateByLockout(prev, loadedNightOTs));
+      setLogs(prev => filterStateByLockout(prev, loadedLogs));
+      setActiveAbnormalities(prev => filterStateByLockout(prev, loadedAbnormalities));
+      setActiveNgs(prev => filterStateByLockout(prev, loadedNgs));
+      setErrorMsg(null);
+    } catch (e) {
+      console.error('Error fetching production plans:', e);
+      setErrorMsg('Gagal terhubung ke database plans.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reorders machine jobs and saves changes to PostgreSQL
+  const reorderMachineJobs = (machineId: string, jobs: Job[], dateStr: string) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    const solved = recalculateTimelineHelper(jobs);
+    setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      dateStr,
+      solved,
+      dayOTs[finalKey] || 'teiji',
+      nightOTs[finalKey] || 'teiji',
+      logs[finalKey] || []
+    );
+  };
+
+  // Connects Socket.io client and binds broadcast listeners for real-time telemetry updates
+  useEffect(() => {
+    fetchPlans();
+    const socket = initSocket();
+    socket.connect();
+    socket.on('connect', () => {
+      console.log('[Socket] Connected to telemetry room');
+    });
+    socket.on('production_plan_updated', (row: any) => {
+      const lastWrite = lastLocalWriteRef.current[row.id];
+      if (lastWrite && Date.now() - lastWrite < 5000) return;
+      if (row.plan_type === 'daily') {
+        setMachineJobs(prev => ({ ...prev, [row.id]: row.jobs || [] }));
+      }
+      if (row.day_ot) setDayOTs(prev => ({ ...prev, [row.id]: row.day_ot }));
+      if (row.night_ot) setNightOTs(prev => ({ ...prev, [row.id]: row.night_ot }));
+      if (row.logs) setLogs(prev => ({ ...prev, [row.id]: row.logs }));
+      setActiveAbnormalities(prev => ({
+        ...prev,
+        [row.id]: { isAbnormal: !!row.is_abnormal, type: row.abnormal_type || '', start: row.abnormal_start || '' }
+      }));
+      setActiveNgs(prev => ({
+        ...prev,
+        [row.id]: { isNg: !!row.is_ng, type: row.ng_type || '', start: row.ng_start || '' }
+      }));
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  // Initializes a machine plan with generated leveled Heijunka schedules if empty
+  const initializeMachineIfEmpty = (machineId: string, dateStr: string, parts: any[]) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    if (machineJobs[finalKey] !== undefined) return;
+    const initialJobs = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+    setMachineJobs(prev => ({ ...prev, [finalKey]: initialJobs }));
+    setDayOTs(prev => ({ ...prev, [finalKey]: 'teiji' }));
+    setNightOTs(prev => ({ ...prev, [finalKey]: 'teiji' }));
+    setLogs(prev => ({ ...prev, [finalKey]: [] }));
+    setActiveAbnormalities(prev => ({ ...prev, [finalKey]: { isAbnormal: false, type: '', start: '' } }));
+    setActiveNgs(prev => ({ ...prev, [finalKey]: { isNg: false, type: '', start: '' } }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      dateStr,
+      initialJobs,
+      'teiji',
+      'teiji',
+      [],
+      false,
+      '',
+      '',
+      false,
+      '',
+      ''
+    );
+  };
+
+  // Increments job volume and appends audit trace records
+  const incrementJobProgress = (
+    machineId: string,
+    jobId: string,
+    qty: number,
+    dateStr: string,
+    parts: any[],
+    logMessage?: { type: string; note: string }
+  ) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    setMachineJobs(prev => {
+      let list = prev[finalKey] || [];
+      if (list.length === 0) {
+        list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+      }
+      const updated = list.map(j => {
+        if (j.id === jobId) {
+          const newQty = Math.min(j.qtyLot, j.actualQty + qty);
+          return { ...j, actualQty: newQty };
+        }
+        return j;
+      });
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        dateStr,
+        updated,
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs
+      );
+      return { ...prev, [finalKey]: updated };
+    });
+  };
+
+  // Modifies a job's status and cascades the timeline changes downstream
+  const updateJobStatus = (
+    machineId: string,
+    jobId: string,
+    action: 'complete-running' | 'complete-dandori',
+    dateStr: string,
+    parts: any[],
+    logMessage?: { type: string; note: string },
+    closedNgQty?: number,
+    closedOkQty?: number
+  ) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    setMachineJobs(prev => {
+      let list = prev[finalKey] || [];
+      if (list.length === 0) {
+        list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+      }
+      const idx = list.findIndex(j => j.id === jobId);
+      if (idx === -1) return prev;
+      const updated = [...list];
+      const nowTimeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      if (action === 'complete-running') {
+        const completedJob = {
+          ...updated[idx],
+          status: 'completed' as const,
+          actualProductionEnd: nowTimeStr,
+          closedNgQty: closedNgQty ?? updated[idx].closedNgQty,
+          closedOkQty: closedOkQty ?? (closedOkQty !== undefined ? closedOkQty : updated[idx].actualQty),
+        };
+        updated[idx] = completedJob;
+        const shortage = completedJob.qtyLot - completedJob.actualQty;
+        if (shortage !== 0) {
+          const nextSameIdx = updated.findIndex((j, fIdx) => fIdx > idx && j.model === completedJob.model && j.status !== 'completed');
+          if (nextSameIdx !== -1) {
+            const targetJob = updated[nextSameIdx];
+            const newQtyLot = Math.max(0, targetJob.qtyLot + shortage);
+            const cavity = targetJob.kav || 1;
+            const ct = targetJob.ct || 60;
+            const newTime = Math.round(((newQtyLot / cavity) * ct) / 60);
+            updated[nextSameIdx] = {
+              ...targetJob,
+              qtyLot: newQtyLot,
+              time: newTime
+            };
+          }
+        }
+        if (idx + 1 < updated.length) {
+          updated[idx + 1] = {
+            ...updated[idx + 1],
+            status: 'dandori',
+            actualDandoriStart: nowTimeStr
+          };
+        }
+      } else if (action === 'complete-dandori') {
+        updated[idx] = {
+          ...updated[idx],
+          status: 'running',
+          actualDandoriEnd: nowTimeStr,
+          actualProductionStart: nowTimeStr
+        };
+      }
+      const solved = recalculateTimelineHelper(updated);
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        dateStr,
+        solved,
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs
+      );
+      return { ...prev, [finalKey]: solved };
+    });
+  };
+
+  // Closes out scheduled jobs for a specific shift in one batch action
+  const closeShiftProduction = (machineId: string, shift: 'day' | 'night', dateStr: string) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const recordDate = new Date().toLocaleDateString();
+    const newRecord = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      machineId,
+      date: recordDate,
+      time,
+      type: 'success',
+      message: `[SHIFT CLOSED] ${shift.toUpperCase()} shift production closed by leader.`
+    };
+    const nextLogs = [newRecord, ...(logs[finalKey] || [])];
+    setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    setMachineJobs(prev => {
+      const list = prev[finalKey] || [];
+      const updated = list.map(j => {
+        if (j.shift === shift && j.status !== 'completed') {
+          return {
+            ...j,
+            status: 'completed' as const,
+            actualProductionEnd: j.actualProductionEnd || time
+          };
+        }
+        return j;
+      });
+      const solved = recalculateTimelineHelper(updated);
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        dateStr,
+        solved,
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs
+      );
+      return { ...prev, [finalKey]: solved };
+    });
+  };
+
+  // Logs unexpected job downtime durations and recalculates Heijunka schedules
+  const addJobDowntime = (
+    machineId: string,
+    jobId: string,
+    downtimeMins: number,
+    dateStr: string,
+    parts: any[],
+    logMessage?: { type: string; note: string }
+  ) => {
+    const finalKey = `${dateStr}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    setMachineJobs(prev => {
+      const list = prev[finalKey] || [];
+      const updated = list.map(j => {
+        if (j.id === jobId) {
+          const prevDowntime = j.downtimeMinutes || 0;
+          return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
+        }
+        return j;
+      });
+      const solved = recalculateTimelineHelper(updated);
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        dateStr,
+        solved,
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs
+      );
+      return { ...prev, [finalKey]: solved };
+    });
+  };
+
+  // Submits a change in abnormal running state for a specific machine
+  const setMachineAbnormal = (
+    machineId: string,
+    isAbnormal: boolean,
+    type = '',
+    start = '',
+    dateStr?: string,
+    logMessage?: { type: string; note: string; timeStr?: string },
+    downtimeMins?: number,
+    downtimeJobId?: string
+  ) => {
+    const date = dateStr || getTodayDateString();
+    const finalKey = `${date}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = logMessage.timeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    setActiveAbnormalities(prev => ({
+      ...prev,
+      [finalKey]: { isAbnormal, type, start }
+    }));
+    if (downtimeMins && downtimeJobId) {
+      setMachineJobs(prev => {
+        const list = prev[finalKey] || [];
+        const updated = list.map(j => {
+          if (j.id === downtimeJobId) {
+            const prevDowntime = j.downtimeMinutes || 0;
+            return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
+          }
+          return j;
+        });
+        const solved = recalculateTimelineHelper(updated);
+        savePlanToDatabase(
+          finalKey,
+          'daily',
+          machineId,
+          date,
+          solved,
+          dayOTs[finalKey] || 'teiji',
+          nightOTs[finalKey] || 'teiji',
+          nextLogs,
+          isAbnormal,
+          type,
+          start
+        );
+        return { ...prev, [finalKey]: solved };
+      });
+    } else {
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        date,
+        machineJobs[finalKey] || [],
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs,
+        isAbnormal,
+        type,
+        start
+      );
+    }
+  };
+
+  // Submits a change in quality NG state for a specific machine
+  const setMachineNg = (
+    machineId: string,
+    isNg: boolean,
+    type = '',
+    start = '',
+    dateStr?: string,
+    logMessage?: { type: string; note: string; timeStr?: string }
+  ) => {
+    const date = dateStr || getTodayDateString();
+    const finalKey = `${date}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = logMessage.timeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    setActiveNgs(prev => ({
+      ...prev,
+      [finalKey]: { isNg, type, start }
+    }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      date,
+      machineJobs[finalKey] || [],
+      dayOTs[finalKey] || 'teiji',
+      nightOTs[finalKey] || 'teiji',
+      nextLogs,
+      undefined,
+      undefined,
+      undefined,
+      isNg,
+      type,
+      start
+    );
+  };
+
+  return (
+    <ProductionContext.Provider
+      value={{
+        machineJobs,
+        logs,
+        dayOTs,
+        nightOTs,
+        activeAbnormalities,
+        activeNgs,
+        isLoading,
+        errorMsg,
+        fetchPlans,
+        initializeMachineIfEmpty,
+        incrementJobProgress,
+        updateJobStatus,
+        closeShiftProduction,
+        addJobDowntime,
+        setMachineAbnormal,
+        setMachineNg,
+        reorderMachineJobs
+      }}
+    >
+      {children}
+    </ProductionContext.Provider>
+  );
+}
+
+// Custom hook to consume the production context state
+export function useProduction() {
+  const context = useContext(ProductionContext);
+  if (context === undefined) {
+    throw new Error('useProduction must be used within a ProductionProvider');
+  }
+  return context;
+}
