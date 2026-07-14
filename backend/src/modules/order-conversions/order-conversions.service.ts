@@ -21,4 +21,12 @@ export const orderConversionsService = {
     const deleted = await orderConversionsRepository.delete(id);
     if (!deleted) throw new AppError(404, 'NOT_FOUND', 'Mapping tidak ditemukan.');
   },
+
+  deleteAll: () => orderConversionsRepository.deleteAll(),
+
+  bulkImport: async (mappings: { cust_part_number: string; cust_sebango?: string; prod_sebango: string; part_category?: string }[]) => {
+    if (!mappings.length) throw new AppError(400, 'VALIDATION_ERROR', 'Data tidak boleh kosong.');
+    return orderConversionsRepository.bulkImport(mappings);
+  }
 };
+

@@ -17,4 +17,13 @@ export const orderConversionsController = {
     await orderConversionsService.delete(req.params.id as string);
     res.json({ status: 'ok', message: 'Mapping dihapus.' });
   },
+  deleteAll: async (_req: Request, res: Response) => {
+    await orderConversionsService.deleteAll();
+    res.json({ status: 'ok', message: 'Semua mapping dihapus.' });
+  },
+  bulkImport: async (req: Request, res: Response) => {
+    const data = await orderConversionsService.bulkImport(req.body);
+    res.status(201).json({ status: 'ok', data });
+  }
 };
+

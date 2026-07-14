@@ -65,5 +65,8 @@ export const orderConversionsRoutes = Router();
  */
 orderConversionsRoutes.get('/',       requireAuth,                         orderConversionsController.getAll);
 orderConversionsRoutes.post('/',      requireAuth, requireRole('planner'), orderConversionsController.create);
+orderConversionsRoutes.post('/import',requireAuth, requireRole('planner'), orderConversionsController.bulkImport);
 orderConversionsRoutes.put('/:id',    requireAuth, requireRole('planner'), orderConversionsController.update);
 orderConversionsRoutes.delete('/:id', requireAuth, requireRole('planner'), orderConversionsController.delete);
+orderConversionsRoutes.delete('/',     requireAuth, requireRole('super-admin'), orderConversionsController.deleteAll);
+
