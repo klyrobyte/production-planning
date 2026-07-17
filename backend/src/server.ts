@@ -12,11 +12,10 @@ const bootstrap = async () => {
   console.log('[DB] Connected to PostgreSQL');
   console.log('[Redis] Connected');
 
-  const httpServer = http.createServer();
+  const app = createApp();
+  const httpServer = http.createServer(app);
   const io = createSocketServer(httpServer);
-  const app = createApp(io);
 
-  httpServer.on('request', app);
   httpServer.listen(env.port, () => {
     console.log(`[Server] Running on http://localhost:${env.port}`);
     console.log(`[Swagger] Docs at http://localhost:${env.port}/api/docs`);

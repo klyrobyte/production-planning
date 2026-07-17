@@ -2,7 +2,7 @@ import { pool } from '../../config/database';
 import { redis } from '../../config/redis';
 
 // The only allowed config keys
-export const ALLOWED_CONFIG_KEYS = ['color_primary', 'color_secondary', 'color_navbar', 'system_title', 'system_logo', 'browser_title'] as const;
+export const ALLOWED_CONFIG_KEYS = ['color_primary', 'color_secondary', 'color_navbar', 'system_title', 'system_logo', 'browser_title', 'machine_types'] as const;
 export type ConfigKey = (typeof ALLOWED_CONFIG_KEYS)[number];
 
 export type SiteConfig = Record<ConfigKey, string>;

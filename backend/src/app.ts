@@ -18,11 +18,9 @@ import { historyOrdersRoutes } from './modules/history-orders/history-orders.rou
 import { createProductionPlansRoutes } from './modules/production-plans/production-plans.routes';
 import { globalLogsRoutes } from './modules/global-logs/global-logs.routes';
 import { siteConfigRoutes } from './modules/site-config/site-config.routes';
-import { Server as SocketServer } from 'socket.io';
 
 // Creates and configures the Express app
-// io is injected here so production-plans routes can broadcast Socket.io events
-export const createApp = (io?: SocketServer) => {
+export const createApp = () => {
   const app = express();
 
   // --- Global Middleware ---
@@ -47,7 +45,7 @@ export const createApp = (io?: SocketServer) => {
   app.use('/api/order-conversions', orderConversionsRoutes);
   app.use('/api/label-counters',    labelCountersRoutes);
   app.use('/api/history-orders',    historyOrdersRoutes);
-  app.use('/api/production-plans',  createProductionPlansRoutes(io));
+  app.use('/api/production-plans',  createProductionPlansRoutes());
   app.use('/api/global-logs',       globalLogsRoutes);
   app.use('/api/site-config',       siteConfigRoutes);
 

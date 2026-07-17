@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
 import { createProductionPlansService } from './production-plans.service';
-import { Server as SocketServer } from 'socket.io';
 
-// Factory function — controller needs access to the io instance
-export const createProductionPlansController = (io?: SocketServer) => {
-  const service = createProductionPlansService(io);
+// Factory function
+export const createProductionPlansController = () => {
+  const service = createProductionPlansService();
 
   return {
     getAll: async (_req: Request, res: Response) => {

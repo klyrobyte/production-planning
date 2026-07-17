@@ -18,11 +18,11 @@ export const leadersController = {
 
   verifyPin: async (req: Request, res: Response) => {
     const { id, pin } = req.body;
-    if (!id || !pin) {
-      res.status(400).json({ status: 'error', code: 'VALIDATION_ERROR', message: 'id dan pin wajib diisi.' });
+    if (!pin) {
+      res.status(400).json({ status: 'error', code: 'VALIDATION_ERROR', message: 'pin wajib diisi.' });
       return;
     }
-    await leadersService.verifyPin(id, String(pin));
+    await leadersService.verifyPin(id ? String(id) : undefined, String(pin));
     res.json({ status: 'ok', message: 'PIN leader valid.' });
   },
 

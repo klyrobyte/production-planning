@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import { createProductionPlansController } from './production-plans.controller';
 import { requireAuth } from '../rbac/rbac.middleware';
-import { Server as SocketServer } from 'socket.io';
 
-// Accepts io so the upsert route can broadcast real-time updates
-export const createProductionPlansRoutes = (io?: SocketServer) => {
+export const createProductionPlansRoutes = () => {
   const router = Router();
-  const ctrl = createProductionPlansController(io);
+  const ctrl = createProductionPlansController();
 
   /**
    * @swagger

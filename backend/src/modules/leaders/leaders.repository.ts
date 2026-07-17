@@ -7,6 +7,12 @@ export const leadersRepository = {
     return rows;
   },
 
+  // Returns all leaders with their PIN hashes for verification when no leader ID is specified
+  findAllWithHash: async () => {
+    const { rows } = await pool.query('SELECT id, name, pin_hash FROM leaders');
+    return rows;
+  },
+
   // Used only by the "reveal PIN" feature — planner only
   findWithPin: async (id: string) => {
     const { rows } = await pool.query('SELECT id, name, pin_encrypted FROM leaders WHERE id = $1', [id]);

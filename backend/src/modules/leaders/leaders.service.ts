@@ -10,7 +10,18 @@ export const leadersService = {
     return leadersRepository.create(name, pinHash, pinEncrypted);
   },
 
-  verifyPin: async (id: string, pin: string): Promise<boolean> => {
+  verifyPin: async (id: string | undefined, pin: string): Promise<boolean> => {
+
+    if (!id) {
+      // If no leader ID was specified, verify the PIN against all leaders in the database
+      const leaders = await leadersRepository.findAllWithHash();
+      for (const leader of leaders) {
+        const valid = await verifyPin(pin, leader.pin_hash);
+        if (valid) return true;
+      }
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'PIN leader tidak valid.');
+    }
+
     const leader = await leadersRepository.findByIdForVerify(id);
     if (!leader) throw new AppError(404, 'NOT_FOUND', 'Leader tidak ditemukan.');
     const valid = await verifyPin(pin, leader.pin_hash);
