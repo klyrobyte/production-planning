@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import api from '../../../shared/lib/axios';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
+import { useProduction } from '../../production/context/ProductionContext';
 
 interface PartForecast {
   sebango: string;
@@ -183,6 +184,7 @@ const getFactoryFromHomeLine = (homeLine: string, activeMachines: MachineItem[])
 
 export default function MonthlyForecastTab() {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
+  const { updateMonthlyPlans } = useProduction();
 
   const [parts, setParts] = useState<any[]>([]);
   const [machines, setMachines] = useState<MachineItem[]>([]);
@@ -202,6 +204,7 @@ export default function MonthlyForecastTab() {
   const [manualMonthN1, setManualMonthN1] = useState('');
   const [manualMonthN2, setManualMonthN2] = useState('');
   const [manualMonthN3, setManualMonthN3] = useState('');
+  const [pendingMachineChanges, setPendingMachineChanges] = useState<Record<string, string>>({});
 
   // UI state variables
   const [isLoading, setIsLoading] = useState(false);
@@ -390,26 +393,32 @@ export default function MonthlyForecastTab() {
     }
   }, [parts, viewState]);
 
-  // Handle direct machine change in table
-  const handleMachineChange = async (partNumber: string, newMachine: string) => {
-    const originalPart = parts.find(pt => pt.part_number === partNumber);
-    if (!originalPart) return;
+  // Handle direct machine change in table (save to pending state first)
+  const handleMachineChange = (partNumber: string, newMachine: string) => {
+    setPendingMachineChanges(prev => ({ ...prev, [partNumber]: newMachine }));
+  };
 
+  const handleSaveMachineChanges = async () => {
     setIsCommitting(true);
+    setErrorMsg('');
     try {
-      const updated = {
-        ...originalPart,
-        home_line: newMachine
-      };
-      await api.post('/parts', updated);
+      const partsToUpdate = Object.keys(pendingMachineChanges).map(partNo => {
+         const p = parts.find(pt => pt.part_number === partNo);
+         return p ? { ...p, home_line: pendingMachineChanges[partNo] } : null;
+      }).filter(Boolean);
       
-      // Update local state parts array
-      setParts(prev => prev.map(p => p.part_number === partNumber ? updated : p));
-      
+      if (partsToUpdate.length > 0) {
+         await api.post('/parts/import', partsToUpdate);
+         const refreshedParts = await api.get('/parts');
+         const partsList = refreshedParts.data.data || [];
+         setParts(partsList);
+         await updateMonthlyPlans(partsList);
+      }
+      setPendingMachineChanges({});
       setCommitSuccess(true);
       setTimeout(() => setCommitSuccess(false), 2000);
     } catch (err) {
-      console.error('Failed to change machine:', err);
+      console.error('Failed to change machines:', err);
       setErrorMsg('Gagal mengganti mesin.');
     } finally {
       setIsCommitting(false);
@@ -699,7 +708,9 @@ export default function MonthlyForecastTab() {
       // Refresh loaded parts
       const refreshedParts = await api.get('/parts');
       const refreshedHistory = await api.get('/history-orders');
-      setParts(refreshedParts.data.data || []);
+      const partsList = refreshedParts.data.data || [];
+      setParts(partsList);
+      await updateMonthlyPlans(partsList);
       
       // Grouping history record update
       const groups: Record<string, any> = {};
@@ -790,7 +801,9 @@ export default function MonthlyForecastTab() {
 
       // Refresh master parts
       const refreshedParts = await api.get('/parts');
-      setParts(refreshedParts.data.data || []);
+      const partsList = refreshedParts.data.data || [];
+      setParts(partsList);
+      await updateMonthlyPlans(partsList);
       setSubTab('active');
       setCommitSuccess(true);
       setTimeout(() => setCommitSuccess(false), 2000);
@@ -874,7 +887,9 @@ export default function MonthlyForecastTab() {
 
       // Refresh data
       const refreshedParts = await api.get('/parts');
-      setParts(refreshedParts.data.data || []);
+      const partsList = refreshedParts.data.data || [];
+      setParts(partsList);
+      await updateMonthlyPlans(partsList);
       
       setCommitSuccess(true);
       setTimeout(() => setCommitSuccess(false), 2000);
@@ -891,9 +906,26 @@ export default function MonthlyForecastTab() {
     handleManualPartSelect('');
   };
 
+  const activeDisplayList = useMemo(() => {
+    const list = viewState === 'preview' ? tempForecast : partsForecast;
+    if (Object.keys(pendingMachineChanges).length === 0) return list;
+    
+    return list.map(item => {
+      const pendingMachine = pendingMachineChanges[item.partNumber];
+      if (pendingMachine !== undefined) {
+        return {
+          ...item,
+          machineId: pendingMachine,
+          factory: getFactoryFromHomeLine(pendingMachine, machines)
+        };
+      }
+      return item;
+    });
+  }, [viewState, tempForecast, partsForecast, pendingMachineChanges, machines]);
+
   // Grouped machine workload chart calculations (FUKA Load hours per day)
   const fukaChartData = useMemo(() => {
-    const activeList = viewState === 'preview' ? tempForecast : partsForecast;
+    const activeList = activeDisplayList;
     if (activeList.length === 0 || machines.length === 0) return {};
     
     // We pre-populate map with ACTUAL configurations from database keys dynamically:
@@ -945,7 +977,6 @@ export default function MonthlyForecastTab() {
     return result;
   }, [partsForecast, tempForecast, viewState, fukaFilter, machines]);
 
-  const activeDisplayList = viewState === 'preview' ? tempForecast : partsForecast;
 
   // Search & Filter List processing
   const processedDisplayList = useMemo(() => {
@@ -1185,18 +1216,21 @@ export default function MonthlyForecastTab() {
             <div className="space-y-4 max-w-4xl">
               <div>
                 <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5">Pilih Part (Sebango / No Part / Model)</label>
-                <select
+                <input
+                  type="text"
+                  list="master-parts-list"
+                  placeholder="Cari Sebango / No Part / Model..."
                   value={selectedManualPartNo}
                   onChange={(e) => handleManualPartSelect(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs font-bold text-slate-700 dark:text-slate-350 outline-none focus:border-emerald-600 cursor-pointer shadow-sm"
-                >
-                  <option value="">-- Pilih Part --</option>
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs font-bold text-slate-700 dark:text-slate-350 outline-none focus:border-emerald-600 shadow-sm"
+                />
+                <datalist id="master-parts-list">
                   {parts.map(p => (
                     <option key={p.part_number} value={p.part_number}>
                       {p.sebango ? `[${p.sebango}] ` : ''}{p.part_number} - {p.part_name || ''}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {selectedManualPartNo && (
@@ -1340,7 +1374,7 @@ export default function MonthlyForecastTab() {
         
         {/* Table Column */}
         <div className="xl:col-span-2 space-y-4 min-w-0">
-          <div className="rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200/50 dark:border-slate-800/50 shadow-sm overflow-hidden flex flex-col h-[720px] transition-all">
+          <div className={`rounded-3xl bg-white dark:bg-slate-900/80 border shadow-sm overflow-hidden flex flex-col h-[720px] transition-all duration-300 ${Object.keys(pendingMachineChanges).length > 0 ? 'border-emerald-500 ring-2 ring-emerald-500/50 shadow-emerald-500/20 shadow-lg' : 'border-slate-200/50 dark:border-slate-800/50'}`}>
             
             {/* Header controls inside Table */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/40 dark:bg-slate-900/40">
@@ -1406,6 +1440,32 @@ export default function MonthlyForecastTab() {
                   >
                     Clear Filter
                   </button>
+                  
+                  {Object.keys(pendingMachineChanges).length > 0 && (
+                    <>
+                      <button
+                        onClick={() => setPendingMachineChanges({})}
+                        disabled={isCommitting}
+                        className="px-2.5 py-1.5 text-[9px] font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 hover:bg-slate-200 rounded-lg border border-slate-200/50 transition-colors uppercase tracking-wider cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveMachineChanges}
+                        disabled={isCommitting}
+                        className="px-3 py-1.5 text-[9px] font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition-opacity uppercase tracking-wider cursor-pointer flex items-center gap-1 animate-pulse"
+                        style={{ backgroundColor: colorPrimary }}
+                      >
+                        {isCommitting ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" /> Menyimpan...
+                          </>
+                        ) : (
+                          `Save (${Object.keys(pendingMachineChanges).length})`
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -1509,13 +1569,16 @@ export default function MonthlyForecastTab() {
                         />
                       </th>
                       <th className="p-1">
-                        <input
-                          type="text"
+                        <select
                           value={columnFilters.machineId}
                           onChange={e => { setColumnFilters(prev => ({ ...prev, machineId: e.target.value })); setCurrentPage(1); }}
-                          placeholder="Filter M/C..."
-                          className="w-full px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-medium outline-none focus:border-emerald-600 bg-white dark:bg-slate-900 dark:text-white"
-                        />
+                          className="w-full px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg text-[9px] font-medium outline-none focus:border-emerald-600 bg-white dark:bg-slate-900 dark:text-white cursor-pointer"
+                        >
+                          <option value="">Filter MC</option>
+                          {machines.map(m => (
+                            <option key={m.id} value={m.code}>{m.code}</option>
+                          ))}
+                        </select>
                       </th>
                       <th className="p-1 bg-emerald-50/5 dark:bg-emerald-950/2 text-right">
                         <input

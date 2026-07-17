@@ -22,17 +22,17 @@ function DashboardPlaceholder() {
 
 
 
-// Inline placeholder for production monitoring
-function ProductionPlaceholder() {
-  return (
-    <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
-      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Production Control</h3>
-      <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
-        Halaman visualisasi timeline Heijunka dan monitoring mesin sedang dalam pengembangan.
-      </p>
-    </div>
-  );
-}
+// // Inline placeholder for production monitoring
+// function ProductionPlaceholder() {
+//   return (
+//     <div className="rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+//       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 uppercase">Production Control</h3>
+//       <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
+//         Halaman visualisasi timeline Heijunka dan monitoring mesin sedang dalam pengembangan.
+//       </p>
+//     </div>
+//   );
+// }
 import LoginPage from './features/auth/pages/LoginPage';
 import UsersPage from './features/users/pages/UsersPage';
 import GlobalLogsPage from './features/global-logs/pages/GlobalLogsPage';
@@ -41,6 +41,7 @@ import FactoriesPage from './features/factories/pages/FactoriesPage';
 import MachinesPage from './features/machines/pages/MachinesPage';
 import DatabasePage from './features/database/pages/DatabasePage';
 import OrdersPage from './features/orders/pages/OrdersPage';
+import ProductionPage from './features/production/pages/ProductionPage';
 
 // Core App bootstrap layout logic
 function AppContent() {
@@ -75,13 +76,21 @@ function AppContent() {
         {/* Protected Area wrapping inside PageLayout Shell */}
         <Route element={<ProtectedRoute />}>
           <Route element={<PageLayout />}>
-            <Route path="/dashboard" element={<DashboardPlaceholder />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/production" element={<ProductionPlaceholder />} />
+            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner', 'leader', 'production-board']} />}>
+              <Route path="/dashboard" element={<DashboardPlaceholder />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner']} />}>
+              <Route path="/orders" element={<OrdersPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner', 'leader']} />}>
+              <Route path="/production" element={<ProductionPage />} />
+            </Route>
+            <Route path="/production/:machine" element={<ProductionPage />} />
+            <Route path="/production/:machine/:tab" element={<ProductionPage />} />
             <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner']} />}>
               <Route path="/database" element={<DatabasePage />} />
             </Route>
-            
+
             <Route element={<ProtectedRoute allowedRoles={['super-admin']} />}>
               <Route path="/users" element={<UsersPage />} />
               <Route path="/factories" element={<FactoriesPage />} />

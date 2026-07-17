@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Printer, Check, Tag } from 'lucide-react';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import api from '../../../shared/lib/axios';
@@ -17,7 +17,10 @@ interface PrintLabelModalProps {
   connectionStatus: string;
   isPrintLocked?: boolean;
   lockMessage?: string;
+  actualQty?: number;
 }
+
+import { useThemeStore } from '../../../shared/store/useThemeStore';
 
 // Formats initials of a full name for printed labels
 function getInitials(name: string) {
@@ -29,25 +32,27 @@ function getInitials(name: string) {
 export function PrintLabelModal({
   partNumber,
   partName,
-  customer,
+  customer: _customer,
   targetTotal,
   labelQty,
   onSuccess,
   onClose,
-  btDevice,
+  btDevice: _btDevice,
   btCharacteristic,
   connectionStatus,
   isPrintLocked = false,
-  lockMessage = ''
+  lockMessage = '',
+  actualQty = 0
 }: PrintLabelModalProps) {
+  const { systemLogo } = useThemeStore();
   const activePortal = useAuthStore(state => state.activePortal);
   const memberName = useAuthStore(state => state.memberName);
   const [parts, setParts] = useState<any[]>([]);
-  const [kelipatan, setKelipatan] = useState<number>(labelQty);
+  const [kelipatan] = useState<number>(labelQty);
   const [isPrinting, setIsPrinting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [printedCount, setPrintedCount] = useState<number>(0);
-  const [labelId, setLabelId] = useState<string>('');
+  const initialPrintedCount = Math.floor(actualQty / (labelQty || 1));
+  const [printedCount, setPrintedCount] = useState<number>(initialPrintedCount);
   const [qrPreviewUrl, setQrPreviewUrl] = useState<string>('');
   const successTimeoutRef = useRef<any>(null);
 
@@ -68,19 +73,10 @@ export function PrintLabelModal({
     try {
       const response = await api.get(`/label-counters/${dateKey}`);
       const nextSeq = response.data?.seq ? (response.data.seq + 1) : 1;
-      const now = new Date();
-      const dd = String(now.getDate()).padStart(2, '0');
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const yy = String(now.getFullYear()).slice(2);
-      setLabelId(`SGT${dd}${mm}${yy}-${String(nextSeq).padStart(4, '0')}`);
       localStorage.setItem(localCounterKey, String(nextSeq - 1));
     } catch (e) {
-      const now = new Date();
-      const dd = String(now.getDate()).padStart(2, '0');
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const yy = String(now.getFullYear()).slice(2);
       const seq = parseInt(localStorage.getItem(localCounterKey) || '0') + 1;
-      setLabelId(`SGT${dd}${mm}${yy}-${String(seq).padStart(4, '0')}`);
+      localStorage.setItem(localCounterKey, String(seq));
     }
   };
 
@@ -154,7 +150,7 @@ export function PrintLabelModal({
     addBytes([0x1B, 0x61, 0x00]);
     addText(SEP);
     addBytes([0x1B, 0x61, 0x01]);
-    const qrContent = partDetails.sebango || partNumber || 'SGT';
+    const qrContent = partNumber || 'SGT';
     const qrBytes = encoder.encode(qrContent);
     const dataLen = qrBytes.length + 3;
     const pL = dataLen & 0xFF;
@@ -179,7 +175,7 @@ export function PrintLabelModal({
   // Opens a pop-up window containing printable label elements
   const handleBrowserPrint = async () => {
     const seqDisp = `${String(printedCount + 1).padStart(2, '0')}/${String(totalLabels).padStart(2, '0')}`;
-    const qrContent = partDetails.sebango || partNumber || 'SGT';
+    const qrContent = partNumber || 'SGT';
     let qrDataUrl = '';
     try {
       qrDataUrl = await QRCode.toDataURL(qrContent, { width: 240, margin: 1 });
@@ -194,7 +190,7 @@ export function PrintLabelModal({
     const uniqueFontSize = customerUniqueItems.length > 1 ? 13 : 24;
     const sebango = partDetails.sebango;
     const model = partDetails.model;
-    const logoSrc = `${window.location.origin}/sugity-logo.png`;
+    const logoSrc = systemLogo || `${window.location.origin}/sugity-logo.png`;
     const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -419,7 +415,7 @@ export function PrintLabelModal({
   }, [partDetails.customerSebango]);
 
   useEffect(() => {
-    const qrContent = partDetails.sebango || partNumber || 'SGT';
+    const qrContent = partNumber || 'SGT';
     QRCode.toDataURL(qrContent, { width: 160, margin: 1 })
       .then(url => setQrPreviewUrl(url))
       .catch(() => setQrPreviewUrl(''));
@@ -502,7 +498,7 @@ export function PrintLabelModal({
               )}
               <div className="flex border-b-[2px] border-black" style={{ minHeight: '68px' }}>
                 <div className="flex flex-col items-center justify-center p-2 border-r-[2px] border-black" style={{ width: '28%' }}>
-                  <img src="/sugity-logo.png" alt="Sugity" className="object-contain" style={{ width: '52px', height: '39px' }} />
+                  <img src={systemLogo || "/sugity-logo.png"} alt="Logo" className="object-contain" style={{ width: '52px', height: '39px' }} />
                   <span style={{ fontSize: '7px', fontWeight: 600, letterSpacing: '2px', marginTop: '3px' }}>SEBANGO</span>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center px-3 py-2 text-center">

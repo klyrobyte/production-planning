@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
+import { destroySocket } from '../lib/socket';
 
 export type UserRole = 'super-admin' | 'planner' | 'leader' | 'production-board' | 'member' | 'guest';
 
@@ -16,13 +17,16 @@ interface AuthState {
   isCheckingSession: boolean;
   activePortal: UserRole;
   activeMachineId: string | null;
+  activeMachineName: string | null;
+  activeMachineCode: string | null;
   activeFactoryId: string | null;
+  activeFactoryName: string | null;
   memberName: string | null;
   isOperatorAuthenticated: boolean;
   loginDevice: (username: string, password: string) => Promise<void>;
   logoutDevice: () => Promise<void>;
   checkSession: () => Promise<void>;
-  verifyOperatorPin: (factoryId: string, machineId: string, pin: string, memberName: string) => Promise<void>;
+  verifyOperatorPin: (factoryId: string, factoryName: string, machineId: string, machineName: string, machineCode: string, pin: string, memberName: string) => Promise<void>;
   logoutOperator: () => void;
   setPortal: (portal: UserRole) => void;
   checkShiftCutoff: () => void;
@@ -40,7 +44,10 @@ const getSavedOperatorState = () => {
       if (now.getTime() - loginTime.getTime() < 12 * 60 * 60 * 1000) {
         return {
           activeMachineId: parsed.machineId,
+          activeMachineName: parsed.machineName || null,
+          activeMachineCode: parsed.machineCode || null,
           activeFactoryId: parsed.factoryId,
+          activeFactoryName: parsed.factoryName || null,
           memberName: parsed.memberName,
           isOperatorAuthenticated: true,
         };
@@ -49,7 +56,7 @@ const getSavedOperatorState = () => {
   } catch (e) {
     console.warn('LocalStorage error reading operator session:', e);
   }
-  return { activeMachineId: null, activeFactoryId: null, memberName: null, isOperatorAuthenticated: false };
+  return { activeMachineId: null, activeMachineName: null, activeMachineCode: null, activeFactoryId: null, activeFactoryName: null, memberName: null, isOperatorAuthenticated: false };
 };
 
 // Manage auth states for device authentication and operator PIN validation
@@ -62,7 +69,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isCheckingSession: true,
     activePortal: 'guest',
     activeMachineId: initialOperator.activeMachineId,
+    activeMachineName: initialOperator.activeMachineName,
+    activeMachineCode: initialOperator.activeMachineCode,
     activeFactoryId: initialOperator.activeFactoryId,
+    activeFactoryName: initialOperator.activeFactoryName,
     memberName: initialOperator.memberName,
     isOperatorAuthenticated: initialOperator.isOperatorAuthenticated,
 
@@ -85,6 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       } catch (e) {
         console.warn('Logout request exception:', e);
       } finally {
+        destroySocket();
         get().logoutOperator();
         set({
           user: null,
@@ -113,12 +124,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     // Validate operator PIN for a specific machine and store session
-    verifyOperatorPin: async (factoryId, machineId, pin, memberName) => {
+    verifyOperatorPin: async (factoryId, factoryName, machineId, machineName, machineCode, pin, memberName) => {
       await api.post('/auth/verify-member-pin', { machine_id: machineId, pin });
       
       const sessionPayload = {
         factoryId,
+        factoryName,
         machineId,
+        machineName,
+        machineCode,
         memberName,
         timestamp: new Date().toISOString(),
       };
@@ -126,7 +140,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       set({
         activeMachineId: machineId,
+        activeMachineName: machineName,
+        activeMachineCode: machineCode,
         activeFactoryId: factoryId,
+        activeFactoryName: factoryName,
         memberName,
         isOperatorAuthenticated: true,
       });
@@ -138,7 +155,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
       localStorage.removeItem('sugity_operator_session');
       set({
         activeMachineId: null,
+        activeMachineName: null,
+        activeMachineCode: null,
         activeFactoryId: null,
+        activeFactoryName: null,
         memberName: null,
         isOperatorAuthenticated: false,
       });

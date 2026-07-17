@@ -8,6 +8,7 @@ interface ThemeState {
   systemTitle: string;
   systemLogo: string;
   browserTitle: string;
+  machineTypes: string;
   isLoading: boolean;
   darkMode: boolean;
   toggleDarkMode: () => void;
@@ -19,6 +20,7 @@ interface ThemeState {
     system_title?: string;
     system_logo?: string;
     browser_title?: string;
+    machine_types?: string;
   }) => Promise<void>;
 }
 
@@ -63,6 +65,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   systemTitle: 'PT. Sugity Creatives',
   systemLogo: '/logo.png',
   browserTitle: 'SC Prod Plan',
+  machineTypes: 'injection,painting',
   isLoading: false,
   darkMode: localStorage.getItem('sugity_dark_mode') === 'true',
 
@@ -95,6 +98,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const title = data.system_title || 'PT. Sugity Creatives';
       const logo = data.system_logo || '/logo.png';
       const bTitle = data.browser_title || 'SC Prod Plan';
+      const mTypes = data.machine_types || 'injection,painting';
       
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -104,6 +108,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
         systemTitle: title,
         systemLogo: logo,
         browserTitle: bTitle,
+        machineTypes: mTypes,
       });
     } catch (err) {
       console.error('Failed to load site config theme:', err);
@@ -124,6 +129,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const title = data.system_title || 'PT. Sugity Creatives';
       const logo = data.system_logo || '/logo.png';
       const bTitle = data.browser_title || 'SC Prod Plan';
+      const mTypes = data.machine_types || 'injection,painting';
 
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -133,6 +139,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
         systemTitle: title,
         systemLogo: logo,
         browserTitle: bTitle,
+        machineTypes: mTypes,
       });
     } catch (err) {
       console.error('Failed to update theme config:', err);

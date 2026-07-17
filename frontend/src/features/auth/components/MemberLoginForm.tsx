@@ -86,13 +86,18 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
       return;
     }
     if (pin.length !== 4) {
-      setError('PIN harus berupa 4 digit angka.');
+      setError('PIN harus berupa 4 karakter alfanumerik.');
       return;
     }
 
     setIsLoading(true);
     try {
-      await verifyOperatorPin(selectedFactoryId, selectedMachineId, pin, memberName.trim());
+      const factoryObj = factories.find(f => f.id === selectedFactoryId);
+      const factoryName = factoryObj ? factoryObj.name : '';
+      const machineObj = machines.find(m => m.id === selectedMachineId);
+      const machineName = machineObj ? machineObj.name : '';
+      const machineCode = machineObj ? machineObj.code : '';
+      await verifyOperatorPin(selectedFactoryId, factoryName, selectedMachineId, machineName, machineCode, pin, memberName.trim());
     } catch (err: any) {
       const responseData = err.response?.data;
       const message = responseData?.message || 'PIN tidak valid atau terjadi kesalahan koneksi.';
@@ -156,7 +161,7 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
       </div>
 
       <div className="space-y-1.5 text-left">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">PIN Member (4 Digit)</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">PIN Mesin (4 Digit)</label>
         <div className="relative">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 dark:text-slate-500">
             <Lock className="h-4 w-4" />
@@ -167,7 +172,7 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
             maxLength={4}
             placeholder="••••"
             value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => setPin(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
             className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-3 pl-10 pr-4 text-center font-mono text-base font-black tracking-widest text-slate-800 dark:text-slate-100 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
           />
         </div>

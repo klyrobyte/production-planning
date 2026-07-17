@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../../../shared/lib/axios';
 import { initSocket } from '../../../shared/lib/socket';
+import { useAuthStore } from '../../../shared/store/useAuthStore';
 
 export type JobStatus = 'completed' | 'dandori' | 'running' | 'queued';
 
@@ -59,6 +60,7 @@ export interface ActiveNg {
 
 interface ProductionContextType {
   machineJobs: Record<string, Job[]>;
+  machineAvgJobs: Record<string, Job[]>;
   logs: Record<string, AbnormalityLog[]>;
   dayOTs: Record<string, string>;
   nightOTs: Record<string, string>;
@@ -71,10 +73,15 @@ interface ProductionContextType {
   incrementJobProgress: (machineId: string, jobId: string, qty: number, dateStr: string, parts: any[], logMessage?: { type: string; note: string }) => void;
   updateJobStatus: (machineId: string, jobId: string, action: 'complete-running' | 'complete-dandori', dateStr: string, parts: any[], logMessage?: { type: string; note: string }, closedNgQty?: number, closedOkQty?: number) => void;
   closeShiftProduction: (machineId: string, shift: 'day' | 'night', dateStr: string) => void;
-  addJobDowntime: (machineId: string, jobId: string, downtimeMins: number, dateStr: string, parts: any[], logMessage?: { type: string; note: string }) => void;
+  addJobDowntime: (machineId: string, jobId: string, downtimeMins: number, dateStr: string, logMessage?: { type: string; note: string }) => void;
   setMachineAbnormal: (machineId: string, isAbnormal: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }, downtimeMins?: number, downtimeJobId?: string) => void;
   setMachineNg: (machineId: string, isNg: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }) => void;
-  reorderMachineJobs: (machineId: string, jobs: Job[], dateStr: string) => void;
+  reorderMachineJobs: (machineId: string, jobs: Job[], dateStr?: string) => void;
+  reorderMachineAvgJobs: (machineId: string, jobs: Job[], dateStr?: string) => void;
+  resetAllMachines: (dateStr?: string, parts?: any[]) => void;
+  updateOTSettings: (machineId: string, dayOT: string, nightOT: string, dateStr?: string) => void;
+  reviseJobNgQty: (machineId: string, jobId: string, newNgQty: number, newOkQty: number, dateStr?: string, logMessage?: { type: string; note: string }) => void;
+  updateMonthlyPlans: (updatedParts: any[], dateStr?: string) => Promise<void>;
 }
 
 const ProductionContext = createContext<ProductionContextType | undefined>(undefined);
@@ -184,15 +191,12 @@ const recalculateTimelineHelper = (items: Job[]): Job[] => {
     const endStr = endJobClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const endTimeStamp = endJobClock.getTime();
     const actualDandori = item.dandori !== undefined ? item.dandori : 15;
-    let dandoriStartStr = '';
-    let dandoriEndStr = '';
     let dandoriRangeStr = '';
     let runningClock = new Date(endJobClock);
     if (actualDandori > 0 && jobShift !== 'overflow') {
       const dandoriStartClock = new Date(endJobClock);
       const dandoriEndClock = addWorkingMinutes(dandoriStartClock, actualDandori);
-      dandoriStartStr = dandoriStartClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      dandoriEndStr = dandoriEndClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const dandoriEndStr = dandoriEndClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       dandoriRangeStr = `${endStr} - ${dandoriEndStr}`;
       runningClock = dandoriEndClock;
     }
@@ -237,23 +241,31 @@ const recalculateTimelineHelper = (items: Job[]): Job[] => {
       }
     }
     if (status === 'completed') {
-      if (!actualDandoriStart) {
-        actualDandoriStart = jobShift === 'night' ? '21:00' : '07:15';
-      }
-      if (!actualDandoriEnd) {
-        actualDandoriEnd = jobShift === 'night' ? '21:10' : '07:30';
-      }
-      if (!actualProductionStart) {
-        actualProductionStart = actualDandoriEnd;
-      }
-      if (!actualProductionEnd) {
-        const [shStr, smStr] = actualProductionStart.split(':');
-        const sh = parseInt(shStr, 10);
-        const sm = parseInt(smStr, 10);
-        const startClock = new Date();
-        startClock.setHours(sh, sm, 0, 0);
-        const endClock = new Date(startClock.getTime() + item.time * 60000);
-        actualProductionEnd = endClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const isSkipped = (item.actualQty === undefined || item.actualQty === 0) && !item.actualProductionStart && !item.actualDandoriStart;
+      if (!isSkipped) {
+        if (!actualDandoriStart) {
+          actualDandoriStart = jobShift === 'night' ? '21:00' : '07:15';
+        }
+        if (!actualDandoriEnd) {
+          actualDandoriEnd = jobShift === 'night' ? '21:10' : '07:30';
+        }
+        if (!actualProductionStart) {
+          actualProductionStart = actualDandoriEnd;
+        }
+        if (!actualProductionEnd) {
+          const [shStr, smStr] = actualProductionStart.split(':');
+          const sh = parseInt(shStr, 10);
+          const sm = parseInt(smStr, 10);
+          const startClock = new Date();
+          startClock.setHours(sh, sm, 0, 0);
+          const endClock = new Date(startClock.getTime() + item.time * 60000);
+          actualProductionEnd = endClock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+      } else {
+        actualDandoriStart = undefined;
+        actualDandoriEnd = undefined;
+        actualProductionStart = undefined;
+        actualProductionEnd = undefined;
       }
     }
     return {
@@ -427,13 +439,13 @@ export const getHeijunkaJobsForMachine = (machineId: string, dateStr: string, pa
   return recalculateTimelineHelper(sortedJobs);
 };
 
-// Resolves the current production date according to the 07:00 shift boundary
+// Resolves the current production date according to the 07:15 shift boundary
 export const getTodayDateString = () => {
   const d = new Date();
   const hours = d.getHours();
   const minutes = d.getMinutes();
   const currentMins = hours * 60 + minutes;
-  if (currentMins < 420) {
+  if (currentMins < 435) {
     d.setDate(d.getDate() - 1);
   }
   const yyyy = d.getFullYear();
@@ -442,9 +454,24 @@ export const getTodayDateString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// Resolves the unique machine key based on factory and machine name
+export const getUniqueMachineKey = (factory: string, machine: string): string => {
+  const cleanFact = factory.trim().toUpperCase();
+  const cleanMc = machine.trim();
+  
+  if (cleanFact.includes('SC2')) return `SC2 ${cleanMc}`;
+  if (cleanFact.includes('2') || cleanFact.includes('F2')) return `F2 ${cleanMc}`;
+  if (cleanFact.includes('3') || cleanFact.includes('F3')) return `F3 ${cleanMc}`;
+  if (cleanFact.includes('4') || cleanFact.includes('F4')) return `F4 ${cleanMc}`;
+  
+  return `${factory} ${cleanMc}`;
+};
+
 // Exposes the context state and synchronization helpers for production telemetry
 export function ProductionProvider({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const [machineJobs, setMachineJobs] = useState<Record<string, Job[]>>({});
+  const [machineAvgJobs, setMachineAvgJobs] = useState<Record<string, Job[]>>({});
   const [logs, setLogs] = useState<Record<string, AbnormalityLog[]>>({});
   const [dayOTs, setDayOTs] = useState<Record<string, string>>({});
   const [nightOTs, setNightOTs] = useState<Record<string, string>>({});
@@ -452,6 +479,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
   const [activeNgs, setActiveNgs] = useState<Record<string, ActiveNg>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState<boolean>(false);
   const lastLocalWriteRef = useRef<Record<string, number>>({});
   const logsRef = useRef(logs);
   useEffect(() => {
@@ -506,6 +534,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     try {
       const response = await api.get('/production-plans');
       const loadedJobs: Record<string, Job[]> = {};
+      const loadedAvgJobs: Record<string, Job[]> = {};
       const loadedDayOTs: Record<string, string> = {};
       const loadedNightOTs: Record<string, string> = {};
       const loadedAbnormalities: Record<string, ActiveAbnormality> = {};
@@ -516,6 +545,8 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         rows.forEach((row: any) => {
           if (row.plan_type === 'daily') {
             loadedJobs[row.id] = row.jobs || [];
+          } else if (row.plan_type === 'avg') {
+            loadedAvgJobs[row.id] = row.jobs || [];
           }
           if (row.day_ot) loadedDayOTs[row.id] = row.day_ot;
           if (row.night_ot) loadedNightOTs[row.id] = row.night_ot;
@@ -543,6 +574,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         return next;
       };
       setMachineJobs(prev => filterStateByLockout(prev, loadedJobs));
+      setMachineAvgJobs(prev => filterStateByLockout(prev, loadedAvgJobs));
       setDayOTs(prev => filterStateByLockout(prev, loadedDayOTs));
       setNightOTs(prev => filterStateByLockout(prev, loadedNightOTs));
       setLogs(prev => filterStateByLockout(prev, loadedLogs));
@@ -554,12 +586,14 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       setErrorMsg('Gagal terhubung ke database plans.');
     } finally {
       setIsLoading(false);
+      setHasFetched(true);
     }
   };
 
   // Reorders machine jobs and saves changes to PostgreSQL
-  const reorderMachineJobs = (machineId: string, jobs: Job[], dateStr: string) => {
-    const finalKey = `${dateStr}_${machineId}`;
+  const reorderMachineJobs = (machineId: string, jobs: Job[], dateStr?: string) => {
+    const date = dateStr || getTodayDateString();
+    const finalKey = `${date}_${machineId}`;
     lastLocalWriteRef.current[finalKey] = Date.now();
     const solved = recalculateTimelineHelper(jobs);
     setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
@@ -567,7 +601,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       finalKey,
       'daily',
       machineId,
-      dateStr,
+      date,
       solved,
       dayOTs[finalKey] || 'teiji',
       nightOTs[finalKey] || 'teiji',
@@ -575,15 +609,191 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     );
   };
 
+  const reorderMachineAvgJobs = (machineId: string, jobs: Job[], dateStr?: string) => {
+    const selectedDate = dateStr || getTodayDateString();
+    const monthStr = selectedDate.substring(0, 7);
+    const avgKey = `${monthStr}_avg_${machineId}`;
+    lastLocalWriteRef.current[avgKey] = Date.now();
+    const solved = recalculateTimelineHelper(jobs);
+    setMachineAvgJobs(prev => ({ ...prev, [avgKey]: solved }));
+    savePlanToDatabase(
+      avgKey,
+      'avg',
+      machineId,
+      monthStr,
+      solved,
+      'teiji',
+      'teiji',
+      []
+    );
+  };
+
+  const resetAllMachines = (dateStr?: string, parts?: any[]) => {
+    const date = dateStr || getTodayDateString();
+    const monthStr = date.substring(0, 7);
+    const ALL_ACTIVE_MACHINES = [
+      ...new Set([
+        ...Object.keys(machineJobs).map(k => k.split('_')[1]),
+        ...Object.keys(machineAvgJobs).map(k => k.split('_')[2] || k.split('_')[1])
+      ].filter(Boolean))
+    ];
+    if (ALL_ACTIVE_MACHINES.length === 0) {
+      ALL_ACTIVE_MACHINES.push(
+        'MC 1', 'MC 2', 'MC 3', 'MC 4', 'MC 5', 'MC 6', 'MC 7', 'MC 8', 'MC 9', 'MC 10',
+        'MC 11', 'MC 12', 'MC 13', 'MC 14', 'MC 15', 'MC 16', 'MC 17', 'MC 18', 'MC 19', 'MC 20', 'MC 21'
+      );
+    }
+
+    const nextJobs: Record<string, Job[]> = {};
+    const nextAvgJobs: Record<string, Job[]> = {};
+
+    for (const machine of ALL_ACTIVE_MACHINES) {
+      const initialJobs = parts && parts.length > 0 ? getHeijunkaJobsForMachine(machine, date, parts) : [];
+      
+      const finalKey = `${date}_${machine}`;
+      lastLocalWriteRef.current[finalKey] = Date.now();
+      nextJobs[finalKey] = initialJobs;
+      savePlanToDatabase(finalKey, 'daily', machine, date, initialJobs, 'teiji', 'teiji', []);
+
+      const avgKey = `${monthStr}_avg_${machine}`;
+      lastLocalWriteRef.current[avgKey] = Date.now();
+      nextAvgJobs[avgKey] = initialJobs;
+      savePlanToDatabase(avgKey, 'avg', machine, monthStr, initialJobs, 'teiji', 'teiji', []);
+    }
+
+    setMachineJobs(prev => ({ ...prev, ...nextJobs }));
+    setMachineAvgJobs(prev => ({ ...prev, ...nextAvgJobs }));
+  };
+
+  const updateOTSettings = (machineId: string, dayOT: string, nightOT: string, dateStr?: string) => {
+    const date = dateStr || getTodayDateString();
+    const finalKey = `${date}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    setDayOTs(prev => ({ ...prev, [finalKey]: dayOT }));
+    setNightOTs(prev => ({ ...prev, [finalKey]: nightOT }));
+    const list = machineJobs[finalKey] || [];
+    const solved = recalculateTimelineHelper(list);
+    setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      date,
+      solved,
+      dayOT,
+      nightOT,
+      logs[finalKey] || []
+    );
+  };
+
+  const reviseJobNgQty = (
+    machineId: string,
+    jobId: string,
+    newNgQty: number,
+    newOkQty: number,
+    dateStr?: string,
+    logMessage?: { type: string; note: string }
+  ) => {
+    const date = dateStr || getTodayDateString();
+    const finalKey = `${date}_${machineId}`;
+    lastLocalWriteRef.current[finalKey] = Date.now();
+    let nextLogs = logs[finalKey] || [];
+    if (logMessage) {
+      const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const recordDate = new Date().toLocaleDateString();
+      const newRecord = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: logMessage.type,
+        message: `[${logMessage.type.toUpperCase()}] ${logMessage.note}`
+      };
+      nextLogs = [newRecord, ...nextLogs];
+      setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
+    }
+    const list = machineJobs[finalKey] || [];
+    const updated = list.map(j => {
+      if (j.id === jobId) {
+        return {
+          ...j,
+          closedNgQty: newNgQty,
+          closedOkQty: newOkQty,
+          actualQty: newOkQty
+        };
+      }
+      return j;
+    });
+    const solved = recalculateTimelineHelper(updated);
+    setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      date,
+      solved,
+      dayOTs[finalKey] || 'teiji',
+      nightOTs[finalKey] || 'teiji',
+      nextLogs
+    );
+  };
+
+  const updateMonthlyPlans = async (updatedParts: any[], dateStr?: string) => {
+    const date = dateStr || getTodayDateString();
+    const monthStr = date.substring(0, 7);
+    
+    const machinesSet = new Set<string>();
+    updatedParts.forEach(p => {
+      if (p.home_line) {
+        const parsed = parseMachineIdentifier(p.home_line);
+        if (parsed && parsed.factory !== 'UNKNOWN' && parsed.machine) {
+          const key = getUniqueMachineKey(parsed.factory, parsed.machine);
+          machinesSet.add(key);
+        }
+      }
+    });
+
+    const activeMachines = Array.from(machinesSet);
+    const nextAvgJobs: Record<string, Job[]> = {};
+
+    for (const machineId of activeMachines) {
+      const initialJobs = getHeijunkaJobsForMachine(machineId, date, updatedParts);
+      const avgKey = `${monthStr}_avg_${machineId}`;
+      lastLocalWriteRef.current[avgKey] = Date.now();
+      nextAvgJobs[avgKey] = initialJobs;
+      
+      await savePlanToDatabase(
+        avgKey,
+        'avg',
+        machineId,
+        monthStr,
+        initialJobs,
+        'teiji',
+        'teiji',
+        []
+      );
+    }
+
+    setMachineAvgJobs(prev => ({ ...prev, ...nextAvgJobs }));
+  };
+
   // Connects Socket.io client and binds broadcast listeners for real-time telemetry updates
   useEffect(() => {
     fetchPlans();
+    if (!isAuthenticated) return;
+
     const socket = initSocket();
     socket.connect();
-    socket.on('connect', () => {
+    
+    const handleConnect = () => {
       console.log('[Socket] Connected to telemetry room');
-    });
-    socket.on('production_plan_updated', (row: any) => {
+    };
+
+    const handleConnectError = (err: any) => {
+      console.error('[Socket] Connection error:', err.message || err);
+    };
+    
+    const handlePlanUpdated = (row: any) => {
       const lastWrite = lastLocalWriteRef.current[row.id];
       if (lastWrite && Date.now() - lastWrite < 5000) return;
       if (row.plan_type === 'daily') {
@@ -600,23 +810,62 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         ...prev,
         [row.id]: { isNg: !!row.is_ng, type: row.ng_type || '', start: row.ng_start || '' }
       }));
-    });
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('connect_error', handleConnectError);
+    socket.on('production_plan_updated', handlePlanUpdated);
+
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('connect_error', handleConnectError);
+      socket.off('production_plan_updated', handlePlanUpdated);
       socket.disconnect();
     };
-  }, []);
+  }, [isAuthenticated]);
+
 
   // Initializes a machine plan with generated leveled Heijunka schedules if empty
   const initializeMachineIfEmpty = (machineId: string, dateStr: string, parts: any[]) => {
+    if (!hasFetched) return;
     const finalKey = `${dateStr}_${machineId}`;
+    const monthStr = dateStr.substring(0, 7);
+    const avgKey = `${monthStr}_avg_${machineId}`;
+
     if (machineJobs[finalKey] !== undefined) return;
+
     const initialJobs = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+    
     setMachineJobs(prev => ({ ...prev, [finalKey]: initialJobs }));
     setDayOTs(prev => ({ ...prev, [finalKey]: 'teiji' }));
     setNightOTs(prev => ({ ...prev, [finalKey]: 'teiji' }));
     setLogs(prev => ({ ...prev, [finalKey]: [] }));
     setActiveAbnormalities(prev => ({ ...prev, [finalKey]: { isAbnormal: false, type: '', start: '' } }));
     setActiveNgs(prev => ({ ...prev, [finalKey]: { isNg: false, type: '', start: '' } }));
+    
+    setMachineAvgJobs(prev => {
+      if (prev[avgKey] === undefined || prev[avgKey].length === 0) {
+        savePlanToDatabase(
+          avgKey,
+          'avg',
+          machineId,
+          monthStr,
+          initialJobs,
+          'teiji',
+          'teiji',
+          [],
+          false,
+          '',
+          '',
+          false,
+          '',
+          ''
+        );
+        return { ...prev, [avgKey]: initialJobs };
+      }
+      return prev;
+    });
+
     savePlanToDatabase(
       finalKey,
       'daily',
@@ -661,30 +910,28 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       nextLogs = [newRecord, ...nextLogs];
       setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
     }
-    setMachineJobs(prev => {
-      let list = prev[finalKey] || [];
-      if (list.length === 0) {
-        list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+    let list = machineJobs[finalKey] || [];
+    if (list.length === 0) {
+      list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+    }
+    const updated = list.map(j => {
+      if (j.id === jobId) {
+        const newQty = Math.min(j.qtyLot, j.actualQty + qty);
+        return { ...j, actualQty: newQty };
       }
-      const updated = list.map(j => {
-        if (j.id === jobId) {
-          const newQty = Math.min(j.qtyLot, j.actualQty + qty);
-          return { ...j, actualQty: newQty };
-        }
-        return j;
-      });
-      savePlanToDatabase(
-        finalKey,
-        'daily',
-        machineId,
-        dateStr,
-        updated,
-        dayOTs[finalKey] || 'teiji',
-        nightOTs[finalKey] || 'teiji',
-        nextLogs
-      );
-      return { ...prev, [finalKey]: updated };
+      return j;
     });
+    setMachineJobs(prev => ({ ...prev, [finalKey]: updated }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      dateStr,
+      updated,
+      dayOTs[finalKey] || 'teiji',
+      nightOTs[finalKey] || 'teiji',
+      nextLogs
+    );
   };
 
   // Modifies a job's status and cascades the timeline changes downstream
@@ -715,13 +962,12 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       nextLogs = [newRecord, ...nextLogs];
       setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
     }
-    setMachineJobs(prev => {
-      let list = prev[finalKey] || [];
-      if (list.length === 0) {
-        list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
-      }
-      const idx = list.findIndex(j => j.id === jobId);
-      if (idx === -1) return prev;
+    let list = machineJobs[finalKey] || [];
+    if (list.length === 0) {
+      list = getHeijunkaJobsForMachine(machineId, dateStr, parts);
+    }
+    const idx = list.findIndex(j => j.id === jobId);
+    if (idx !== -1) {
       const updated = [...list];
       const nowTimeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       if (action === 'complete-running') {
@@ -765,6 +1011,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         };
       }
       const solved = recalculateTimelineHelper(updated);
+      setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
       savePlanToDatabase(
         finalKey,
         'daily',
@@ -775,8 +1022,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         nightOTs[finalKey] || 'teiji',
         nextLogs
       );
-      return { ...prev, [finalKey]: solved };
-    });
+    }
   };
 
   // Closes out scheduled jobs for a specific shift in one batch action
@@ -791,35 +1037,99 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       date: recordDate,
       time,
       type: 'success',
-      message: `[SHIFT CLOSED] ${shift.toUpperCase()} shift production closed by leader.`
+      message: `[SHIFT CLOSED] ${shift.toUpperCase()} shift production closed. Unfinished target carried over.`
     };
     const nextLogs = [newRecord, ...(logs[finalKey] || [])];
     setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
-    setMachineJobs(prev => {
-      const list = prev[finalKey] || [];
-      const updated = list.map(j => {
-        if (j.shift === shift && j.status !== 'completed') {
-          return {
+    
+    const list = machineJobs[finalKey] || [];
+    const carriedOverJobs: Job[] = [];
+    
+    const updated = list.map(j => {
+      if (j.shift === shift && j.status !== 'completed') {
+        const remainingQty = j.qtyLot - (j.actualQty || 0);
+        if (remainingQty > 0) {
+          const nextShift = shift === 'day' ? 'night' : 'day';
+          const cavity = j.kav || 1;
+          const ct = j.ct || 60;
+          const newTime = Math.round(((remainingQty / cavity) * ct) / 60);
+
+          carriedOverJobs.push({
             ...j,
-            status: 'completed' as const,
-            actualProductionEnd: j.actualProductionEnd || time
-          };
+            id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+            qtyLot: remainingQty,
+            actualQty: 0,
+            closedNgQty: 0,
+            closedOkQty: 0,
+            status: 'queued',
+            shift: nextShift,
+            time: newTime,
+            actualProductionStart: undefined,
+            actualProductionEnd: undefined,
+            actualDandoriStart: undefined,
+            actualDandoriEnd: undefined,
+            downtimeMinutes: 0
+          });
         }
-        return j;
-      });
-      const solved = recalculateTimelineHelper(updated);
-      savePlanToDatabase(
-        finalKey,
-        'daily',
-        machineId,
-        dateStr,
-        solved,
-        dayOTs[finalKey] || 'teiji',
-        nightOTs[finalKey] || 'teiji',
-        nextLogs
-      );
-      return { ...prev, [finalKey]: solved };
+        const hasStarted = !!j.actualProductionStart;
+        return {
+          ...j,
+          status: 'completed' as const,
+          actualProductionEnd: hasStarted ? (j.actualProductionEnd || time) : undefined
+        };
+      }
+      return j;
     });
+
+    let solved = recalculateTimelineHelper(updated);
+    
+    if (shift === 'day' && carriedOverJobs.length > 0) {
+      const firstNightIdx = solved.findIndex(j => j.shift === 'night');
+      if (firstNightIdx !== -1) {
+        solved.splice(firstNightIdx, 0, ...carriedOverJobs);
+      } else {
+        solved.push(...carriedOverJobs);
+      }
+      solved.forEach((j, idx) => { j.seq = idx + 1; });
+      solved = recalculateTimelineHelper(solved);
+    }
+
+    setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+    savePlanToDatabase(
+      finalKey, 'daily', machineId, dateStr, solved,
+      dayOTs[finalKey] || 'teiji', nightOTs[finalKey] || 'teiji', nextLogs
+    );
+
+    if (shift === 'night' && carriedOverJobs.length > 0) {
+      const parts = dateStr.split('-');
+      const nextDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextYyyy = nextDate.getFullYear();
+      const nextMm = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const nextDd = String(nextDate.getDate()).padStart(2, '0');
+      const nextDateStr = `${nextYyyy}-${nextMm}-${nextDd}`;
+      
+      const nextKey = `${nextDateStr}_${machineId}`;
+      setMachineJobs(prev => {
+        const nextList = prev[nextKey] || [];
+        let nextUpdated = [...nextList];
+        const firstDayIdx = nextUpdated.findIndex(j => j.shift === 'day');
+        if (firstDayIdx !== -1) {
+          nextUpdated.splice(firstDayIdx, 0, ...carriedOverJobs);
+        } else {
+          nextUpdated.unshift(...carriedOverJobs);
+        }
+        nextUpdated.forEach((j, idx) => { j.seq = idx + 1; });
+        const nextSolved = recalculateTimelineHelper(nextUpdated);
+        
+        savePlanToDatabase(
+          nextKey, 'daily', machineId, nextDateStr, nextSolved,
+          dayOTs[nextKey] || 'teiji', nightOTs[nextKey] || 'teiji', logs[nextKey] || []
+        );
+        
+        return { ...prev, [nextKey]: nextSolved };
+      });
+    }
   };
 
   // Logs unexpected job downtime durations and recalculates Heijunka schedules
@@ -828,7 +1138,6 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     jobId: string,
     downtimeMins: number,
     dateStr: string,
-    parts: any[],
     logMessage?: { type: string; note: string }
   ) => {
     const finalKey = `${dateStr}_${machineId}`;
@@ -848,28 +1157,26 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       nextLogs = [newRecord, ...nextLogs];
       setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
     }
-    setMachineJobs(prev => {
-      const list = prev[finalKey] || [];
-      const updated = list.map(j => {
-        if (j.id === jobId) {
-          const prevDowntime = j.downtimeMinutes || 0;
-          return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
-        }
-        return j;
-      });
-      const solved = recalculateTimelineHelper(updated);
-      savePlanToDatabase(
-        finalKey,
-        'daily',
-        machineId,
-        dateStr,
-        solved,
-        dayOTs[finalKey] || 'teiji',
-        nightOTs[finalKey] || 'teiji',
-        nextLogs
-      );
-      return { ...prev, [finalKey]: solved };
+    const list = machineJobs[finalKey] || [];
+    const updated = list.map(j => {
+      if (j.id === jobId) {
+        const prevDowntime = j.downtimeMinutes || 0;
+        return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
+      }
+      return j;
     });
+    const solved = recalculateTimelineHelper(updated);
+    setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+    savePlanToDatabase(
+      finalKey,
+      'daily',
+      machineId,
+      dateStr,
+      solved,
+      dayOTs[finalKey] || 'teiji',
+      nightOTs[finalKey] || 'teiji',
+      nextLogs
+    );
   };
 
   // Submits a change in abnormal running state for a specific machine
@@ -906,31 +1213,29 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       [finalKey]: { isAbnormal, type, start }
     }));
     if (downtimeMins && downtimeJobId) {
-      setMachineJobs(prev => {
-        const list = prev[finalKey] || [];
-        const updated = list.map(j => {
-          if (j.id === downtimeJobId) {
-            const prevDowntime = j.downtimeMinutes || 0;
-            return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
-          }
-          return j;
-        });
-        const solved = recalculateTimelineHelper(updated);
-        savePlanToDatabase(
-          finalKey,
-          'daily',
-          machineId,
-          date,
-          solved,
-          dayOTs[finalKey] || 'teiji',
-          nightOTs[finalKey] || 'teiji',
-          nextLogs,
-          isAbnormal,
-          type,
-          start
-        );
-        return { ...prev, [finalKey]: solved };
+      const list = machineJobs[finalKey] || [];
+      const updated = list.map(j => {
+        if (j.id === downtimeJobId) {
+          const prevDowntime = j.downtimeMinutes || 0;
+          return { ...j, downtimeMinutes: prevDowntime + downtimeMins, time: j.time + downtimeMins };
+        }
+        return j;
       });
+      const solved = recalculateTimelineHelper(updated);
+      setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
+      savePlanToDatabase(
+        finalKey,
+        'daily',
+        machineId,
+        date,
+        solved,
+        dayOTs[finalKey] || 'teiji',
+        nightOTs[finalKey] || 'teiji',
+        nextLogs,
+        isAbnormal,
+        type,
+        start
+      );
     } else {
       savePlanToDatabase(
         finalKey,
@@ -997,10 +1302,62 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     );
   };
 
+  const machineJobsRef = useRef(machineJobs);
+  useEffect(() => {
+    machineJobsRef.current = machineJobs;
+  }, [machineJobs]);
+
+  const closeShiftRef = useRef(closeShiftProduction);
+  useEffect(() => {
+    closeShiftRef.current = closeShiftProduction;
+  }, [closeShiftProduction]);
+
+  // Auto-rollover shift evaluation every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const hh = now.getHours();
+      const mm = now.getMinutes();
+      
+      const dateStr = getTodayDateString();
+      
+      // Auto close day shift at 19:00
+      if (hh === 19 && mm === 0) {
+         const machineKeys = Object.keys(machineJobsRef.current).filter(k => k.startsWith(dateStr));
+         machineKeys.forEach(key => {
+            const machineId = key.split('_')[1];
+            if (machineId) {
+               closeShiftRef.current(machineId, 'day', dateStr);
+            }
+         });
+      }
+
+      // Auto close night shift at 07:15
+      if (hh === 7 && mm === 15) {
+         const prevDate = new Date();
+         prevDate.setDate(prevDate.getDate() - 1);
+         const pyyyy = prevDate.getFullYear();
+         const pmm = String(prevDate.getMonth() + 1).padStart(2, '0');
+         const pdd = String(prevDate.getDate()).padStart(2, '0');
+         const prevDateStr = `${pyyyy}-${pmm}-${pdd}`;
+
+         const machineKeys = Object.keys(machineJobsRef.current).filter(k => k.startsWith(prevDateStr));
+         machineKeys.forEach(key => {
+            const machineId = key.split('_')[1];
+            if (machineId) {
+               closeShiftRef.current(machineId, 'night', prevDateStr);
+            }
+         });
+      }
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <ProductionContext.Provider
       value={{
         machineJobs,
+        machineAvgJobs,
         logs,
         dayOTs,
         nightOTs,
@@ -1016,7 +1373,12 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         addJobDowntime,
         setMachineAbnormal,
         setMachineNg,
-        reorderMachineJobs
+        reorderMachineJobs,
+        reorderMachineAvgJobs,
+        resetAllMachines,
+        updateOTSettings,
+        reviseJobNgQty,
+        updateMonthlyPlans
       }}
     >
       {children}

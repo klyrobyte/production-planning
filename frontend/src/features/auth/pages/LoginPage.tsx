@@ -11,14 +11,18 @@ export default function LoginPage() {
   const user = useAuthStore((state) => state.user);
   const logoutDevice = useAuthStore((state) => state.logoutDevice);
   const isOperatorAuthenticated = useAuthStore((state) => state.isOperatorAuthenticated);
+  const activeMachineCode = useAuthStore((state) => state.activeMachineCode);
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
   const systemTitle = useThemeStore((state) => state.systemTitle);
   const systemLogo = useThemeStore((state) => state.systemLogo);
 
   // Redirect logged-in non-members, or logged-in members who are also operator authenticated
-  const shouldRedirect = isAuthenticated && user && (user.role !== 'member' || isOperatorAuthenticated);
-  if (shouldRedirect) {
-    return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated && user) {
+    if (user.role !== 'member') {
+      return <Navigate to="/dashboard" replace />;
+    } else if (isOperatorAuthenticated && activeMachineCode) {
+      return <Navigate to={`/production/${activeMachineCode}/execution`} replace />;
+    }
   }
 
   return (

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  X, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  X,
   Cpu,
   Key
 } from 'lucide-react';
@@ -34,7 +34,12 @@ interface MachineItem {
 export default function MachinesPage() {
   const activePortal = useAuthStore((state) => state.activePortal);
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
+  const machineTypes = useThemeStore((state) => state.machineTypes);
   const isSuperAdmin = activePortal === 'super-admin';
+
+  const typesList = machineTypes
+    ? machineTypes.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
+    : ['injection', 'painting'];
 
   const [machines, setMachines] = useState<MachineItem[]>([]);
   const [factories, setFactories] = useState<FactoryItem[]>([]);
@@ -197,9 +202,9 @@ export default function MachinesPage() {
 
   const filteredMachines = machines.filter((m) => {
     const q = searchQuery.toLowerCase();
-    const matchQuery = 
-      m.code.toLowerCase().includes(q) || 
-      m.name.toLowerCase().includes(q) || 
+    const matchQuery =
+      m.code.toLowerCase().includes(q) ||
+      m.name.toLowerCase().includes(q) ||
       (m.type && m.type.toLowerCase().includes(q)) ||
       m.factory_code.toLowerCase().includes(q);
     const matchFactory = filterFactoryId ? m.factory_id === filterFactoryId : true;
@@ -248,7 +253,7 @@ export default function MachinesPage() {
             className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
           />
         </div>
-        
+
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-white">Filter Pabrik:</span>
           <select
@@ -316,11 +321,10 @@ export default function MachinesPage() {
                       {machine.tonnage || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
-                        machine.status === 'active'
+                      <span className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${machine.status === 'active'
                           ? 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-450'
                           : 'bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700 text-slate-500 dark:text-slate-405'
-                      }`}>
+                        }`}>
                         {machine.status === 'active' ? 'Aktif' : 'Nonaktif'}
                       </span>
                     </td>
@@ -399,7 +403,7 @@ export default function MachinesPage() {
                   type="text"
                   value={machineCode}
                   onChange={(e) => setMachineCode(e.target.value)}
-                  placeholder="Contoh: MC 1"
+                  placeholder="[Pabrik]-[MC]-[Nomor Mesin]"
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
                 />
               </div>
@@ -416,14 +420,19 @@ export default function MachinesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Tipe Mesin</label>
-                <input
-                  type="text"
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Tipe Mesin *</label>
+                <select
                   value={machineType}
                   onChange={(e) => setMachineType(e.target.value)}
-                  placeholder="Contoh: Injection, Blow molding"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
-                />
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 cursor-pointer"
+                >
+                  <option value="">-- Pilih Tipe Mesin --</option>
+                  {typesList.map((type) => (
+                    <option key={type} value={type} className="capitalize">
+                      {type}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1">

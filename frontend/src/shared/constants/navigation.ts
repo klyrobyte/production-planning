@@ -26,7 +26,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     label: '3M Dashboard',
     path: '/dashboard',
     icon: LayoutDashboard,
-    allowedRoles: ['super-admin', 'planner', 'leader', 'production-board', 'member'],
+    allowedRoles: ['super-admin', 'planner', 'leader', 'production-board'],
   },
   {
     id: 'orders',
@@ -40,7 +40,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     label: 'Production Control',
     path: '/production',
     icon: Factory,
-    allowedRoles: ['super-admin', 'planner', 'leader', 'member'],
+    allowedRoles: ['super-admin', 'planner', 'leader'],
   },
   {
     id: 'database',

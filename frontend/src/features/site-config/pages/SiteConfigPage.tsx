@@ -10,6 +10,7 @@ export default function SiteConfigPage() {
   const systemTitle = useThemeStore((state) => state.systemTitle);
   const systemLogo = useThemeStore((state) => state.systemLogo);
   const browserTitle = useThemeStore((state) => state.browserTitle);
+  const machineTypes = useThemeStore((state) => state.machineTypes);
   const updateTheme = useThemeStore((state) => state.updateTheme);
 
   // Local state for configuration inputs
@@ -19,6 +20,7 @@ export default function SiteConfigPage() {
   const [titleInput, setTitleInput] = useState(systemTitle);
   const [logoInput, setLogoInput] = useState(systemLogo);
   const [browserTitleInput, setBrowserTitleInput] = useState(browserTitle);
+  const [machineTypesInput, setMachineTypesInput] = useState(machineTypes);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -33,7 +35,8 @@ export default function SiteConfigPage() {
     setTitleInput(systemTitle);
     setLogoInput(systemLogo);
     setBrowserTitleInput(browserTitle);
-  }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle]);
+    setMachineTypesInput(machineTypes);
+  }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle, machineTypes]);
 
   // Shared file processor for logo image
   const processLogoFile = (file: File) => {
@@ -91,8 +94,9 @@ export default function SiteConfigPage() {
         system_title: titleInput,
         system_logo: logoInput,
         browser_title: browserTitleInput,
+        machine_types: machineTypesInput,
       });
-      setSuccessMsg('Branding warna dan identitas berhasil disimpan dan diperbarui secara global.');
+      setSuccessMsg('Konfigurasi berhasil disimpan dan diperbarui secara global.');
       // Auto dismiss success toast after 3 seconds
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
@@ -115,6 +119,7 @@ export default function SiteConfigPage() {
         system_title: 'PT. Sugity Creatives',
         system_logo: '',
         browser_title: 'SC Prod Plan',
+        machine_types: 'injection,painting',
       });
       setSuccessMsg('Branding warna dan identitas telah dikembalikan ke standar bawaan.');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -170,6 +175,21 @@ export default function SiteConfigPage() {
                   onChange={(e) => setBrowserTitleInput(e.target.value)}
                   placeholder="Contoh: SC Prod Plan"
                   className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900"
+                />
+              </div>
+
+              {/* Jenis Mesin (Dropdown Options) */}
+              <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Opsi Tipe Mesin</h4>
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Pilihan tipe mesin di Machine Management (pisahkan dengan koma)</p>
+                </div>
+                <input
+                  type="text"
+                  value={machineTypesInput}
+                  onChange={(e) => setMachineTypesInput(e.target.value)}
+                  placeholder="Contoh: injection,painting,assembly"
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900 font-mono"
                 />
               </div>
 

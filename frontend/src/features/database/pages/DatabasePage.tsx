@@ -4,17 +4,19 @@ import api from '../../../shared/lib/axios';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import MasterPartsTab from '../components/MasterPartsTab';
 import OrderConversionsTab from '../components/OrderConversionsTab';
+import LeadersTab from '../components/LeadersTab';
 
 export default function DatabasePage() {
   const user = useAuthStore((state) => state.user);
   const userRole = user?.role;
 
-  // Page Tab state: 'parts' | 'conversions'
-  const [pageTab, setPageTab] = useState<'parts' | 'conversions'>('parts');
+  // Page Tab state: 'parts' | 'conversions' | 'leaders'
+  const [pageTab, setPageTab] = useState<'parts' | 'conversions' | 'leaders'>('parts');
 
   // Triggers to tell child tabs to refresh their lists
   const [partsRefreshTrigger, setPartsRefreshTrigger] = useState(0);
   const [conversionsRefreshTrigger, setConversionsRefreshTrigger] = useState(0);
+  const [leadersRefreshTrigger] = useState(0);
 
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -63,10 +65,14 @@ export default function DatabasePage() {
         <div className="text-left">
           <p className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Database Manager</p>
           <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800 dark:text-white mt-0.5">
-            {pageTab === 'parts' ? 'Master Parts Database' : 'Order Conversions (Data Converter)'}
+            {pageTab === 'parts' 
+              ? 'Master Parts Database' 
+              : pageTab === 'conversions' 
+              ? 'Order Conversions (Data Converter)' 
+              : 'Leaders Database'}
           </h2>
         </div>
-        {userRole === 'super-admin' && (
+        {userRole === 'super-admin' && pageTab !== 'leaders' && (
           <button
             onClick={pageTab === 'parts' ? handleDeleteAllParts : handleDeleteAllConversions}
             disabled={isLoading}
@@ -117,13 +123,25 @@ export default function DatabasePage() {
         >
           Data Converter (Order Conversions)
         </button>
+        <button
+          onClick={() => setPageTab('leaders')}
+          className={`px-6 py-2.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            pageTab === 'leaders'
+              ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm font-bold border border-slate-250/20'
+              : 'text-slate-550 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Leaders Database
+        </button>
       </div>
 
       {/* Conditional rendering of sub-feature tabs */}
       {pageTab === 'parts' ? (
         <MasterPartsTab refreshTrigger={partsRefreshTrigger} />
-      ) : (
+      ) : pageTab === 'conversions' ? (
         <OrderConversionsTab refreshTrigger={conversionsRefreshTrigger} />
+      ) : (
+        <LeadersTab refreshTrigger={leadersRefreshTrigger} />
       )}
     </div>
   );

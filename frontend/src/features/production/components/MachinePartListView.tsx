@@ -1,26 +1,31 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { PackageSearch, ArrowRight, ShieldCheck, Plus, X, Calendar, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
-import { useProduction, getUniqueMachineKey } from '../context/ProductionContext';
+import { useProduction, getUniqueMachineKey, machinesMatch } from '../context/ProductionContext';
 import type { Job } from '../context/ProductionContext';
 import api from '../../../shared/lib/axios';
 
 interface MachinePartListViewProps {
   machine: string;
   factory: string;
+  machineKey?: string;
   selectedDate?: string;
 }
 
 // Displays registered parts and schedules them for production queue
-export function MachinePartListView({ machine, factory, selectedDate }: MachinePartListViewProps) {
+export function MachinePartListView({ machine, factory, machineKey: propsMachineKey, selectedDate }: MachinePartListViewProps) {
   const activePortal = useAuthStore(state => state.activePortal);
   const canEditPattern = activePortal === 'super-admin' || activePortal === 'planner' || activePortal === 'leader';
-  const machineKey = getUniqueMachineKey(factory, machine);
+  const machineKey = propsMachineKey || getUniqueMachineKey(factory, machine);
 
   const {
-    jobs,
+    machineJobs,
     reorderMachineJobs
-  } = useProduction(machineKey, selectedDate);
+  } = useProduction();
+
+  const activeDate = selectedDate || new Date().toISOString().slice(0, 10);
+  const planKey = `${activeDate}_${machineKey}`;
+  const jobs = machineJobs[planKey] || [];
 
   const [partListDb, setPartListDb] = useState<any[]>([]);
   const [schedulingPart, setSchedulingPart] = useState<any | null>(null);
@@ -80,6 +85,7 @@ export function MachinePartListView({ machine, factory, selectedDate }: MachineP
       material: schedulingPart.material || 'PP RESIN',
       kav: cavity,
       ct: ct,
+      spec: schedulingPart.spec,
       dandori: parsedDandori,
       time: runtimeMins,
       status: jobs.length === 0 ? 'dandori' : 'queued',
@@ -87,7 +93,7 @@ export function MachinePartListView({ machine, factory, selectedDate }: MachineP
       shift: 'day',
     };
     const newJobs = [...jobs, newJob];
-    reorderMachineJobs(newJobs);
+    reorderMachineJobs(machineKey, newJobs, activeDate);
     setSchedulingPart(null);
     triggerNotification(`Part ${newJob.model} berhasil ditambahkan ke antrean produksi!`);
   };
@@ -97,29 +103,30 @@ export function MachinePartListView({ machine, factory, selectedDate }: MachineP
   }, []);
 
   const formattedFactory = useMemo(() => {
-    if (factory === 'FACT 2') return 'F2';
-    if (factory === 'FACT 3') return 'F3';
-    if (factory === 'FACT 4') return 'F4';
+    const upper = factory.toUpperCase();
+    if (upper.includes('FACT 2') || upper.includes('FACTORY 2') || upper === 'F2') return 'F2';
+    if (upper.includes('FACT 3') || upper.includes('FACTORY 3') || upper === 'F3') return 'F3';
+    if (upper.includes('FACT 4') || upper.includes('FACTORY 4') || upper === 'F4') return 'F4';
+    if (upper.includes('SC2')) return 'SC2';
     return '';
   }, [factory]);
 
-  const matchMachineSubstring = `${formattedFactory} ${machine}`;
-  const matchMachineSubstringAlt = `${formattedFactory}${machine}`;
+  const targetMachineCode = `${formattedFactory}-${machine}`;
 
   const homeLineParts = useMemo(() => {
     return partListDb.filter(p => {
-      const hl = (p.home_line || p.homeLine || '').trim().toUpperCase();
-      return hl === matchMachineSubstring.toUpperCase() || hl === matchMachineSubstringAlt.toUpperCase();
+      const hl = (p.home_line || p.homeLine || '').trim();
+      return hl && machinesMatch(hl, targetMachineCode);
     });
-  }, [partListDb, matchMachineSubstring, matchMachineSubstringAlt]);
+  }, [partListDb, targetMachineCode]);
 
   const backupLineParts = useMemo(() => {
     return partListDb.filter(p => {
-      const bl = (p.backup_line || p.backupLine || '').trim().toUpperCase();
-      const hl = (p.home_line || p.homeLine || '').trim().toUpperCase();
-      return (bl === matchMachineSubstring.toUpperCase() || bl === matchMachineSubstringAlt.toUpperCase()) && hl !== bl;
+      const bl = (p.backup_line || p.backupLine || '').trim();
+      const hl = (p.home_line || p.homeLine || '').trim();
+      return bl && machinesMatch(bl, targetMachineCode) && (!hl || !machinesMatch(hl, targetMachineCode));
     });
-  }, [partListDb, matchMachineSubstring, matchMachineSubstringAlt]);
+  }, [partListDb, targetMachineCode]);
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900 p-6 relative">

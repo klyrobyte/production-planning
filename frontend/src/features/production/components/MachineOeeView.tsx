@@ -1,56 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Award, Clock, Activity, Zap, CheckCircle2, RefreshCw, Printer, ShieldAlert, Cpu } from 'lucide-react';
 import { useProduction, getUniqueMachineKey } from '../context/ProductionContext';
-import api from '../../../shared/lib/axios';
 
 interface MachineOeeViewProps {
   machine: string;
   factory: string;
+  machineKey?: string;
   selectedDate?: string;
 }
 
 // Renders the OEE breakdown dials and printer hardware status telemetry
-export function MachineOeeView({ machine, factory, selectedDate }: MachineOeeViewProps) {
-  const machineKey = getUniqueMachineKey(factory, machine);
+export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, selectedDate }: MachineOeeViewProps) {
+  const machineKey = propsMachineKey || getUniqueMachineKey(factory, machine);
   const activeDate = selectedDate || new Date().toISOString().slice(0, 10);
   const planKey = `${activeDate}_${machineKey}`;
 
   const {
     machineJobs,
-    logs,
-    dayOTs,
-    nightOTs,
-    activeAbnormalities,
-    activeNgs
+    logs
   } = useProduction();
 
   const jobs = machineJobs[planKey] || [];
   const logList = logs[planKey] || [];
 
   const [printerConnected, setPrinterConnected] = useState(true);
-  const [paperLevel, setPaperLevel] = useState(85);
-  const [batteryLevel, setBatteryLevel] = useState(90);
+  const [paperLevel] = useState(85);
+  const [batteryLevel] = useState(90);
   const [isJamSimulated, setIsJamSimulated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [parts, setParts] = useState<any[]>([]);
   const [printQueue, setPrintQueue] = useState<{ id: string; time: string; label: string; status: 'printed' | 'pending-retry' | 'failed' }[]>([
     { id: '1', time: '14:22', label: 'Box #021 - Part 62511-0K560-C0', status: 'printed' },
     { id: '2', time: '15:05', label: 'Box #022 - Part 62511-0K560-C0', status: 'printed' }
   ]);
-
-  // Loads parts list
-  const loadParts = async () => {
-    try {
-      const res = await api.get('/parts');
-      setParts(res.data?.data || []);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadParts();
-  }, []);
 
   const metrics = React.useMemo(() => {
     let totalPlannedMins = jobs.reduce((sum, j) => sum + (j.time || 0) + (j.dandori || 0), 0);
