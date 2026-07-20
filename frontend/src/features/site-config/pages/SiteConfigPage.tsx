@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, Layout, Palette, Upload, Trash2 } from 'lucide-react';
+import { Save, RotateCcw, Layout, Palette, Upload, Trash2, Bluetooth, Plus, Pencil, X, Check } from 'lucide-react';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
+import api from '../../../shared/lib/axios';
+
 
 // Render the branding theme color manager with real-time mockup preview card
 export default function SiteConfigPage() {
@@ -13,7 +15,6 @@ export default function SiteConfigPage() {
   const machineTypes = useThemeStore((state) => state.machineTypes);
   const updateTheme = useThemeStore((state) => state.updateTheme);
 
-  // Local state for configuration inputs
   const [primaryInput, setPrimaryInput] = useState(colorPrimary);
   const [secondaryInput, setSecondaryInput] = useState(colorSecondary);
   const [navbarInput, setNavbarInput] = useState(colorNavbar);
@@ -27,7 +28,6 @@ export default function SiteConfigPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Sync inputs with global state changes
   useEffect(() => {
     setPrimaryInput(colorPrimary);
     setSecondaryInput(colorSecondary);
@@ -38,7 +38,6 @@ export default function SiteConfigPage() {
     setMachineTypesInput(machineTypes);
   }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle, machineTypes]);
 
-  // Shared file processor for logo image
   const processLogoFile = (file: File) => {
     setErrorMsg(null);
     if (file.size > 500 * 1024) {
@@ -57,31 +56,23 @@ export default function SiteConfigPage() {
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      processLogoFile(file);
-    }
+    if (file) processLogoFile(file);
   };
 
-  // Drag and drop event handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+  const handleDragLeave = () => setIsDragging(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processLogoFile(file);
-    }
+    if (file) processLogoFile(file);
   };
 
-  // Save color theme configuration to backend database
   const handleSave = async () => {
     setIsSaving(true);
     setSuccessMsg(null);
@@ -97,7 +88,6 @@ export default function SiteConfigPage() {
         machine_types: machineTypesInput,
       });
       setSuccessMsg('Konfigurasi berhasil disimpan dan diperbarui secara global.');
-      // Auto dismiss success toast after 3 seconds
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
       setErrorMsg('Gagal menyimpan konfigurasi branding.');
@@ -106,7 +96,6 @@ export default function SiteConfigPage() {
     }
   };
 
-  // Reset colors and text back to standard Sugity Creatives branding
   const handleResetToDefault = async () => {
     setIsSaving(true);
     setSuccessMsg(null);
@@ -128,6 +117,115 @@ export default function SiteConfigPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // ── Bluetooth Printer Registry ─────────────────────────────────────────────
+  interface BtPrinter { id: number; name: string; service_uuid: string; notes: string | null; }
+  const [printers, setPrinters] = useState<BtPrinter[]>([]);
+  const [printerLoading, setPrinterLoading] = useState(false);
+  const [editingPrinter, setEditingPrinter] = useState<Partial<BtPrinter> | null>(null);
+  const [printerError, setPrinterError] = useState<string | null>(null);
+
+  const fetchPrinters = async () => {
+    setPrinterLoading(true);
+    try {
+      const res = await api.get('/bt-printers');
+      setPrinters(res.data.data || []);
+    } catch { /* ignore */ } finally { setPrinterLoading(false); }
+  };
+
+  useEffect(() => { fetchPrinters(); }, []);
+
+  const [isPairing, setIsPairing] = useState(false);
+
+  /** Perform real Bluetooth pairing and save to DB */
+  const handlePairNewPrinter = async () => {
+    const isBtSupported = typeof window !== 'undefined' && 'bluetooth' in navigator;
+    if (!isBtSupported) {
+      setPrinterError('Web Bluetooth tidak tersedia di browser ini. Gunakan Chrome/Edge di desktop atau Android.');
+      return;
+    }
+    setIsPairing(true);
+    setPrinterError(null);
+    try {
+      const savedUuids = printers.map(p => p.service_uuid);
+
+      const device = await (navigator as any).bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: savedUuids.length > 0 ? savedUuids : undefined,
+      });
+      const server = await device.gatt.connect();
+
+      // Discover all services and find a writable characteristic
+      let writeChar: any = null;
+      let serviceUuid = '';
+      try {
+        const allServices = await server.getPrimaryServices();
+        for (const service of allServices) {
+          try {
+            const chars = await service.getCharacteristics();
+            writeChar = chars.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+            if (writeChar) { serviceUuid = service.uuid; break; }
+          } catch { /* skip */ }
+        }
+      } catch { /* getPrimaryServices not available */ }
+
+      if (!writeChar || !serviceUuid) {
+        server.disconnect?.();
+        setPrinterError('Tidak ditemukan characteristic yang bisa di-write. Pastikan ini adalah printer BLE yang aktif.');
+        return;
+      }
+
+      // Disconnect after pairing — the execution page will reconnect using the saved UUID
+      server.disconnect?.();
+
+      const deviceName = device.name || 'Printer Baru';
+      
+      // Save pairing info to localStorage so execution page knows which printer to auto-connect to
+      const pairedInfo = { name: deviceName, serviceUuid, deviceId: device.id };
+      localStorage.setItem('sugity_paired_printer', JSON.stringify(pairedInfo));
+
+      await api.post('/bt-printers/register', {
+        name: deviceName,
+        service_uuid: serviceUuid,
+        notes: 'Paired via Site Config',
+      });
+
+      await fetchPrinters();
+    } catch (e: any) {
+      if (e?.name !== 'NotFoundError') { // User cancelled the picker
+        setPrinterError(e?.message || 'Pairing gagal. Coba lagi.');
+      }
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
+  const handleSavePrinterEdit = async () => {
+    if (!editingPrinter?.name?.trim() || !editingPrinter?.service_uuid?.trim()) {
+      setPrinterError('Nama dan Service UUID wajib diisi.');
+      return;
+    }
+    setPrinterError(null);
+    try {
+      await api.put(`/bt-printers/${editingPrinter!.id}`, {
+        name: editingPrinter!.name,
+        service_uuid: editingPrinter!.service_uuid,
+        notes: editingPrinter!.notes,
+      });
+      setEditingPrinter(null);
+      await fetchPrinters();
+    } catch (e: any) {
+      setPrinterError(e?.response?.data?.error || 'Gagal menyimpan printer.');
+    }
+  };
+
+  const handleDeletePrinter = async (id: number) => {
+    if (!confirm('Hapus printer ini dari registry?')) return;
+    try {
+      await api.delete(`/bt-printers/${id}`);
+      await fetchPrinters();
+    } catch { /* ignore */ }
   };
 
   return (
@@ -178,7 +276,7 @@ export default function SiteConfigPage() {
                 />
               </div>
 
-              {/* Jenis Mesin (Dropdown Options) */}
+              {/* Jenis Mesin */}
               <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
                 <div className="space-y-0.5">
                   <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Opsi Tipe Mesin</h4>
@@ -213,8 +311,8 @@ export default function SiteConfigPage() {
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
                       className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-2 px-3 text-[9px] font-black uppercase tracking-wider transition ${isDragging
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                          : 'border-slate-300 dark:border-slate-850 text-slate-500 dark:text-slate-450 hover:bg-white dark:hover:bg-slate-950 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-700'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-300 dark:border-slate-850 text-slate-500 dark:text-slate-450 hover:bg-white dark:hover:bg-slate-950 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-700'
                         } cursor-pointer`}
                     >
                       <Upload className="h-3.5 w-3.5" />
@@ -371,9 +469,7 @@ export default function SiteConfigPage() {
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-inner bg-slate-100 dark:bg-slate-950 flex aspect-video w-full select-none">
             {/* Sidebar Mock */}
             <div
-              style={{
-                backgroundColor: secondaryInput,
-              }}
+              style={{ backgroundColor: secondaryInput }}
               className="w-1/4 h-full border-r border-black/5 p-3 flex flex-col justify-between text-white transition-all duration-300"
             >
               <div className="space-y-4">
@@ -446,6 +542,127 @@ export default function SiteConfigPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Bluetooth Printer Registry */}
+      <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Bluetooth className="h-4.5 w-4.5 text-blue-500" />
+            <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-350">Registry Bluetooth Printer</span>
+          </div>
+          <button
+            onClick={handlePairNewPrinter}
+            disabled={isPairing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white transition-all cursor-pointer"
+          >
+            {isPairing ? <><span className="animate-spin">↻</span> Scanning...</> : <><Bluetooth className="h-3 w-3" /> Pair Printer Baru</>}
+          </button>
+        </div>
+
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-4 font-medium">
+          Printer yang pernah terhubung akan otomatis terdaftar di sini. UUID yang tersimpan akan diprioritaskan saat koneksi berikutnya sehingga proses pairing lebih cepat dan reliable.
+        </p>
+
+        {/* Inline form for Edit only — pairing is done via the Pair button */}
+        {editingPrinter !== null && editingPrinter.id && (
+          <div className="mb-5 rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/10 p-4 space-y-3">
+            <h4 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-wider">Edit Printer</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Printer</label>
+                <input
+                  type="text"
+                  value={editingPrinter.name || ''}
+                  onChange={e => setEditingPrinter(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Contoh: Printer F2 MC1"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Service UUID</label>
+                <input
+                  type="text"
+                  value={editingPrinter.service_uuid || ''}
+                  onChange={e => setEditingPrinter(p => ({ ...p, service_uuid: e.target.value.toLowerCase().trim() }))}
+                  placeholder="0000ffe0-0000-1000-8000-00805f9b34fb"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Catatan (opsional)</label>
+              <input
+                type="text"
+                value={editingPrinter.notes || ''}
+                onChange={e => setEditingPrinter(p => ({ ...p, notes: e.target.value }))}
+                placeholder="Lokasi printer, keterangan lain..."
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+              />
+            </div>
+            {printerError && (
+              <p className="text-[10px] font-bold text-rose-600 dark:text-rose-400">{printerError}</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setEditingPrinter(null); setPrinterError(null); }}
+                className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <X className="h-3 w-3" /> Batal
+              </button>
+              <button
+                onClick={handleSavePrinterEdit}
+                className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg bg-blue-600 hover:bg-blue-700 text-white cursor-pointer transition-colors"
+              >
+                <Check className="h-3 w-3" /> Simpan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Printer List */}
+        {printerLoading ? (
+          <div className="text-center py-8 text-xs text-slate-400 font-bold">Memuat data printer...</div>
+        ) : printers.length === 0 ? (
+          <div className="text-center py-10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+            <Bluetooth className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Belum ada printer terdaftar.</p>
+            <p className="text-[10px] text-slate-300 dark:text-slate-700 mt-1">Printer akan otomatis terdaftar saat pertama kali terhubung dari halaman produksi.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {printers.map(printer => (
+              <div key={printer.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
+                  <Bluetooth className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate">{printer.name}</p>
+                  <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">{printer.service_uuid}</p>
+                  {printer.notes && (
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">{printer.notes}</p>
+                  )}
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => { setEditingPrinter({ ...printer }); setPrinterError(null); }}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-300 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => handleDeletePrinter(printer.id)}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600 hover:border-rose-300 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                    title="Hapus"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

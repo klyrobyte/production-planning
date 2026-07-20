@@ -12,6 +12,7 @@ import { PrintLabelModal } from './PrintLabelModal';
 import api from '../../../shared/lib/axios';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useScreenControls } from '../../../shared/hooks/useScreenControls';
+import { useBtPrinterStore } from '../../../shared/store/useBtPrinterStore';
 
 interface MachineExecutionViewProps {
     machine: string;
@@ -132,87 +133,61 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         return () => clearInterval(timer);
     }, []);
 
-    // Bluetooth Printer Connection State (Persisted during session)
-    const [btDevice, setBtDevice] = useState<any>(null);
-    const [btCharacteristic, setBtCharacteristic] = useState<any>(null);
-    const [connectionStatus, setConnectionStatus] = useState<string>('disconnected'); // 'disconnected' | 'connecting' | 'connected' | 'error'
-    const [connectionError, setConnectionError] = useState<string>('');
+    // ── Bluetooth: consume from global store (survives page navigation) ──────
+    const btDevice           = useBtPrinterStore(s => s.btDevice);
+    const btCharacteristic   = useBtPrinterStore(s => s.btCharacteristic);
+    const connectionStatus   = useBtPrinterStore(s => s.connectionStatus);
+    const connectionError    = useBtPrinterStore(s => s.connectionError);
+    const onDeviceConnected  = useBtPrinterStore(s => s.onDeviceConnected);
+    const btDisconnect       = useBtPrinterStore(s => s.disconnect);
+    const findWriteCharacteristic = useBtPrinterStore(s => s.findWriteCharacteristic);
 
     const isBtConnected = connectionStatus === 'connected';
     const isBtReadyForProduction = isBtConnected || bypassBtRequirement;
-
     const isBluetoothSupported = typeof window !== 'undefined' && 'bluetooth' in navigator;
+
+    // Fetch registered printer UUIDs from database
+    const { data: savedPrinters = [] } = useQuery<any[]>({
+        queryKey: ['bt-printers'],
+        queryFn: async () => (await api.get('/bt-printers')).data?.data || [],
+        staleTime: 5 * 60_000,
+    });
 
     const connectBluetoothPrinter = async () => {
         if (!isBluetoothSupported) {
             alert("⚠️ WEB BLUETOOTH TIDAK TERSEDIA!\n\nWeb Bluetooth API tidak didukung oleh browser Anda, atau Anda mengakses via IP Address tanpa HTTPS (insecure context).\n\nSolusi:\n1. Aktifkan 'Dev Bypass Mode' di panel kanan untuk testing.\n2. Atau gunakan HTTPS.\n3. Atau di Chrome HP, buka 'chrome://flags/#unsafely-treat-insecure-origin-as-secure', masukkan alamat IP & Port ini, ubah ke 'Enabled', lalu restart Chrome.");
-            setConnectionError("Web Bluetooth requires HTTPS/localhost.");
-            setConnectionStatus('error');
+            useBtPrinterStore.setState({ connectionError: 'Web Bluetooth requires HTTPS/localhost.', connectionStatus: 'error' });
             return;
         }
-        setConnectionStatus('connecting');
-        setConnectionError('');
+        useBtPrinterStore.setState({ connectionStatus: 'connecting', connectionError: '' });
+
+        const savedUuids = savedPrinters.map((p: any) => p.service_uuid as string);
 
         try {
             const device = await (navigator as any).bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb', '000018f0-0000-1000-8000-00805f9b34fb']
+                optionalServices: savedUuids,
             });
 
-            setConnectionStatus('connecting');
+            useBtPrinterStore.setState({ connectionStatus: 'connecting' });
             const server = await device.gatt.connect();
-            
-            let service;
-            try {
-                service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-            } catch (e) {
-                service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const result = await findWriteCharacteristic(server, savedUuids);
+
+            if (!result) {
+                throw new Error('Tidak ditemukan characteristic yang bisa di-write pada printer ini. Pastikan printer dalam mode aktif.');
             }
-            
-            const characteristics = await service.getCharacteristics();
-            const writeChar = characteristics.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
-            
-            if (!writeChar) {
-                throw new Error('No write characteristic found on printer.');
-            }
-            
-            setBtDevice(device);
-            setBtCharacteristic(writeChar);
-            setConnectionStatus('connected');
-            
-            if (device.name) {
-                localStorage.setItem('sugity_last_printer', device.name);
-            }
-            
-            device.addEventListener('gattserverdisconnected', () => {
-                setBtDevice(null);
-                setBtCharacteristic(null);
-                setConnectionStatus('disconnected');
-            });
+
+            onDeviceConnected(device, result.char, result.serviceUuid);
         } catch (err: any) {
             console.error('Bluetooth Connection Error:', err);
-            setConnectionError(err.message || 'Failed to connect. Ensure printer is paired.');
-            setConnectionStatus('error');
+            useBtPrinterStore.setState({ connectionError: err.message || 'Failed to connect. Ensure printer is paired.', connectionStatus: 'error' });
         }
     };
 
     const disconnectBluetoothPrinter = () => {
-        if (btDevice && btDevice.gatt.connected) {
-            btDevice.gatt.disconnect();
-        }
-        setBtDevice(null);
-        setBtCharacteristic(null);
-        setConnectionStatus('disconnected');
+        btDisconnect();
     };
 
-    // Disconnect on unmount
-    useEffect(() => {
-        return () => {
-            if (btDevice && btDevice.gatt.connected) {
-                btDevice.gatt.disconnect();
-            }
-        };
-    }, [btDevice]);
 
     const handlePrintSuccess = (printedQty: number) => {
         if (!activeJob) return;
@@ -241,7 +216,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         if (!activeJob.actualProductionStart || typeof activeJob.actualProductionStart !== 'string') {
             return { isLocked: false, message: '' };
         }
-        
+
         // Parse start time to date
         const parts = activeJob.actualProductionStart.split(':');
         if (parts.length < 2) return { isLocked: false, message: '' };
@@ -252,7 +227,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         if (startDate.getTime() > currentLiveTime.getTime()) {
             startDate.setDate(startDate.getDate() - 1);
         }
-        
+
         // Calculate ongoing downtime if abnormal or NG is active
         let ongoingDowntimeSecs = 0;
         if (abnormality.isAbnormal && abnormality.start) {
@@ -278,19 +253,19 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         const diffMs = currentLiveTime.getTime() - startDate.getTime();
         const totalElapsedSecs = Math.floor(diffMs / 1000);
         const netElapsedSecs = Math.max(0, totalElapsedSecs - (activeJob.downtimeMinutes || 0) * 60 - ongoingDowntimeSecs);
-        
+
         const cavity = activeJob.kav || 1;
         const ct = activeJob.ct || 60;
-        
+
         // Quantity per kanban/box is activeJob.spec
         const labelQty = activeJob.spec ?? 24;
-        
+
         // Target quantity if we print this label box
         const targetTotalQty = activeJob.actualQty + labelQty;
-        
+
         const currentMaxProduced = Math.floor((netElapsedSecs / ct) * cavity);
         const isLocked = currentMaxProduced < targetTotalQty;
-        
+
         let message = '';
         if (isLocked) {
             if (abnormality.isAbnormal || ngState.isNg) {
@@ -302,7 +277,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                 message = `Print Terkunci: Mesin baru memproduksi sekitar ${currentMaxProduced}/${activeJob.qtyLot} pcs berdasarkan durasi aktif & cycle time. Butuh sekitar ${remainingMins} menit lagi untuk mencetak label box berikutnya.`;
             }
         }
-        
+
         return { isLocked, message };
     }, [activeJob, currentLiveTime, abnormality, ngState]);
 
@@ -376,7 +351,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         if (abnormality.isAbnormal) {
             const now = new Date();
             const nowStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-            
+
             // Calculate downtime automatically
             let dMins = 0;
             if (abnormality.start) {
@@ -388,7 +363,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                     dMins = Math.max(0, Math.round((now.getTime() - startD.getTime()) / 60000));
                 }
             }
-            
+
             setMachineAbnormal(
                 machineKey, false, '', '', selectedDate,
                 { type: 'abnormal', note: getLogNote(`Abnormal RESOLVED: ${abnormality.type}. Downtime: ${dMins} min. Start: ${abnormality.start} | Stop: ${nowStr}`), timeStr: nowStr },
@@ -430,11 +405,10 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
             <div className="flex items-center justify-end gap-2">
                 <button
                     onClick={toggleWakeLock}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-                        isWakeLockActive
-                            ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
-                    }`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${isWakeLockActive
+                        ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
+                        }`}
                     title={isWakeLockActive ? 'Screen stay-awake aktif — klik untuk nonaktifkan' : 'Aktifkan screen stay-awake agar tablet tidak mati otomatis'}
                 >
                     {isWakeLockActive ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
@@ -442,11 +416,10 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                 </button>
                 <button
                     onClick={toggleFullscreen}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-                        isFullscreen
-                            ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
-                    }`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${isFullscreen
+                        ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
+                        }`}
                     title={isFullscreen ? 'Keluar dari fullscreen' : 'Masuk fullscreen mode'}
                 >
                     {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
@@ -498,10 +471,10 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
 
             {/* Two-Column Sidebar Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-                
+
                 {/* LEFT MAIN COLUMN: Current Active Job + Up Next in Queue */}
                 <div className="lg:col-span-3 space-y-6 flex flex-col">
-                    
+
                     {/* Current Active Job Panel */}
                     {activeJob ? (
                         <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between relative">
@@ -518,7 +491,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                     <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-1">
                                         Printer Bluetooth Wajib Terhubung
                                     </h3>
-                                    
+
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-md mb-6 animate-pulse">
                                         Koneksi printer Bluetooth terputus atau tablet baru ter-reset. Untuk menjamin cetakan Kanban & Label produksi valid, sambungkan Bluetooth Printer sebelum memproses job ini.
                                     </p>
@@ -528,11 +501,10 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                             type="button"
                                             onClick={connectBluetoothPrinter}
                                             disabled={!isBluetoothSupported || connectionStatus === 'connecting'}
-                                            className={`w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer border-0 ${
-                                                !isBluetoothSupported 
-                                                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed' 
-                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                            }`}
+                                            className={`w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer border-0 ${!isBluetoothSupported
+                                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                }`}
                                         >
                                             {connectionStatus === 'connecting' ? (
                                                 <><RefreshCw className="w-4 h-4 animate-spin" /> Connecting Printer...</>
@@ -615,7 +587,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                                 {isFirstInShift ? "Shift Start Preparation In Progress" : "Changeover In Progress"}
                                             </h3>
                                             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                                                {isFirstInShift 
+                                                {isFirstInShift
                                                     ? `Perform shift start preparation for model ${activeJob.model}. Check molds, machine state, and load materials before starting production.`
                                                     : `Prepare the mold ${activeJob.mold} and load the resin material ${activeJob.material}.`}
                                             </p>
@@ -627,7 +599,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-750 text-white rounded-[4px] font-black uppercase tracking-widest text-sm transition-all shadow-md flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600">
                                                 <CheckCircle2 className="w-5 h-5" /> {isFirstInShift ? "Finish Shift Preparation" : "Finish Dandori Setup"}
                                             </button>
-                                            
+
                                             <button onClick={() => closeShiftProduction(machineKey, activeJob.shift === 'night' ? 'night' : 'day', selectedDate)}
                                                 disabled={isReadOnlyMode}
                                                 className="w-full py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-950">
@@ -767,7 +739,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                             ) : (
                                 jobs.map((job, idx) => (
                                     <div key={job.id} className={`flex items-center gap-4 px-4 py-3 transition-colors ${job.status === 'running' ? 'bg-emerald-50/40 dark:bg-emerald-950/10' :
-                                            job.status === 'dandori' ? 'bg-blue-50/40 dark:bg-blue-950/10' : ''
+                                        job.status === 'dandori' ? 'bg-blue-50/40 dark:bg-blue-950/10' : ''
                                         }`}>
                                         <span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500 shrink-0">{idx + 1}</span>
                                         <div className="flex-1 min-w-0">
@@ -790,7 +762,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                 {/* RIGHT COLUMN: Printer Connection + Activity Log */}
                 <div className="lg:col-span-1">
                     <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-800 flex flex-col min-h-[450px]">
-                        
+
                         {/* Section 1: Printer Connection */}
                         <div className="p-4 space-y-3">
                             <div className="flex justify-between items-center">
@@ -839,17 +811,16 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                     )}
                                 </div>
                             )}
-                            
+
                             {/* Dev Mode Bypass BT Pairing Requirement Toggle */}
                             <div className="pt-2.5 border-t border-slate-100 dark:border-slate-900 flex items-center justify-between mt-2.5">
                                 <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tight">Dev Bypass Mode:</span>
                                 <button
                                     onClick={toggleBypassBtRequirement}
-                                    className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-colors cursor-pointer border-0 ${
-                                        bypassBtRequirement
-                                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-450'
-                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400'
-                                    }`}
+                                    className={`px-2.5 py-1 rounded text-[8px] font-black uppercase transition-colors cursor-pointer border-0 ${bypassBtRequirement
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-450'
+                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400'
+                                        }`}
                                 >
                                     {bypassBtRequirement ? '⚡ Bypass ON' : '🔒 Strict BT Req'}
                                 </button>
@@ -924,11 +895,11 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                     logList.slice(0, 50).map(entry => {
                                         const isAbnormalLog = entry.type === 'abnormal' || (entry.message || '').toUpperCase().includes('[ABNORMAL');
                                         const isNgLog = entry.type === 'ng' || (entry.message || '').toUpperCase().includes('[NG');
-                                        const logColor = 
-                                            isAbnormalLog 
-                                                ? 'text-rose-600 dark:text-rose-455 font-bold' 
-                                                : isNgLog 
-                                                    ? 'text-amber-600 dark:text-amber-455 font-bold' 
+                                        const logColor =
+                                            isAbnormalLog
+                                                ? 'text-rose-600 dark:text-rose-455 font-bold'
+                                                : isNgLog
+                                                    ? 'text-amber-600 dark:text-amber-455 font-bold'
                                                     : 'text-emerald-650 dark:text-emerald-400 font-bold';
                                         return (
                                             <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5">

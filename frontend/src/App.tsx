@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useThemeStore } from './shared/store/useThemeStore';
 import { useAuthStore } from './shared/store/useAuthStore';
+import { useBtPrinterManager } from './shared/hooks/useBtPrinterManager';
 import { AppProviders } from './app/providers';
 import ProtectedRoute from './shared/components/layout/ProtectedRoute';
 import PageLayout from './shared/components/layout/PageLayout';
@@ -49,6 +50,9 @@ function AppContent() {
   const checkSession = useAuthStore((state) => state.checkSession);
   const isCheckingSession = useAuthStore((state) => state.isCheckingSession);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  // Global Bluetooth manager — keeps connection alive across page navigations
+  useBtPrinterManager();
 
   // Initialize theme config and load current session token
   useEffect(() => {

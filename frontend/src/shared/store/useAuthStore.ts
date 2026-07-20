@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '../lib/axios';
 import { destroySocket } from '../lib/socket';
+import { clearBtPairing } from './useBtPrinterStore';
 
 export type UserRole = 'super-admin' | 'planner' | 'leader' | 'production-board' | 'member' | 'guest';
 
@@ -153,6 +154,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     // Log out operator session and clear storage variables
     logoutOperator: () => {
       localStorage.removeItem('sugity_operator_session');
+      clearBtPairing(); // clears localStorage + Zustand BT store state
       set({
         activeMachineId: null,
         activeMachineName: null,
