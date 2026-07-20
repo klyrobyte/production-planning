@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, Layout, Palette, Upload, Trash2, Bluetooth, Plus, Pencil, X, Check } from 'lucide-react';
+import { Save, RotateCcw, Layout, Palette, Upload, Trash2, Bluetooth, Pencil, X, Check } from 'lucide-react';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
 import api from '../../../shared/lib/axios';
 
