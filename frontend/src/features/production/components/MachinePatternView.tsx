@@ -742,134 +742,157 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
                   <span className="absolute left-[-90px] w-[80px] text-[13.5px] font-black text-slate-400 uppercase tracking-wider text-right pr-2 select-none">
                     Act. Prod
                   </span>
-                  <div className="w-full h-10 bg-slate-50/20 border border-slate-200/50 rounded-lg z-30 shadow-inner relative backdrop-blur-[0.5px] overflow-hidden">
-                    {allShiftJobs.map((job) => {
-                      if (!job.timeRange) return null;
-                      if (job.status === 'queued') return null;
+                  {/* Wrapper: relative so both sibling layers align perfectly */}
+                  <div className="relative flex-1 h-10">
 
-                      const isSkipped = job.status === 'completed' && 
-                                        (job.actualQty === undefined || job.actualQty === 0) && 
-                                        !job.actualProductionStart && 
-                                        !job.actualDandoriStart;
-                      if (isSkipped) return null;
+                    {/* ── Layer 1 & 2: bar colors + loss overlays (clipped inside overflow-hidden) ── */}
+                    <div className="absolute inset-0 rounded-lg shadow-inner bg-slate-50/20 border border-slate-200/50 backdrop-blur-[0.5px] overflow-hidden">
+                      {allShiftJobs.map((job) => {
+                        if (!job.timeRange) return null;
+                        if (job.status === 'queued') return null;
 
-                      const actTime = actualTimes[job.id];
-                      if (!actTime) return null;
+                        const isSkipped = job.status === 'completed' &&
+                                          (job.actualQty === undefined || job.actualQty === 0) &&
+                                          !job.actualProductionStart &&
+                                          !job.actualDandoriStart;
+                        if (isSkipped) return null;
 
-                      let dandoriElement = null;
-                      if (job.dandori > 0 && (job.status === 'completed' || job.status === 'running')) {
-                        const dStartOffset = getMinutesOffset(actTime.dandoriStartStr);
-                        const dEndOffset = getMinutesOffset(actTime.dandoriEndStr);
-                        const dLeftPercent = (dStartOffset / totalMins) * 100;
-                        const dWidthPercent = ((dEndOffset - dStartOffset) / totalMins) * 100;
+                        const actTime = actualTimes[job.id];
+                        if (!actTime) return null;
 
-                        if (dWidthPercent > 0) {
-                          dandoriElement = (
-                            <div
-                              key={`act-dandori-${job.id}`}
-                              className="absolute top-0 bottom-0 bg-slate-900 border border-slate-800 flex items-center justify-center z-25"
-                              style={{
-                                left: `${dLeftPercent}%`,
-                                width: `${dWidthPercent}%`,
-                              }}
-                              title={`Actual Setup Changeover (Dandori): ${job.dandori} mins`}
-                            >
-                              <span className="text-[7px] text-white/50 font-bold">D</span>
-                            </div>
-                          );
+                        let dandoriElement = null;
+                        if (job.dandori > 0 && (job.status === 'completed' || job.status === 'running')) {
+                          const dStartOffset = getMinutesOffset(actTime.dandoriStartStr);
+                          const dEndOffset = getMinutesOffset(actTime.dandoriEndStr);
+                          const dLeftPercent = (dStartOffset / totalMins) * 100;
+                          const dWidthPercent = ((dEndOffset - dStartOffset) / totalMins) * 100;
+
+                          if (dWidthPercent > 0) {
+                            dandoriElement = (
+                              <div
+                                key={`act-dandori-${job.id}`}
+                                className="absolute top-0 bottom-0 bg-slate-900 border border-slate-800 flex items-center justify-center z-10"
+                                style={{ left: `${dLeftPercent}%`, width: `${dWidthPercent}%` }}
+                                title={`Actual Setup Changeover (Dandori): ${job.dandori} mins`}
+                              >
+                                <span className="text-[7px] text-white/50 font-bold">D</span>
+                              </div>
+                            );
+                          }
                         }
-                      }
 
-                      if (job.status === 'dandori') {
-                        return null;
-                      }
+                        if (job.status === 'dandori') return null;
 
-                      const startOffset = getMinutesOffset(actTime.productionStartStr);
-                      let endOffset = getMinutesOffset(actTime.productionEndStr);
+                        const startOffset = getMinutesOffset(actTime.productionStartStr);
+                        let endOffset = getMinutesOffset(actTime.productionEndStr);
+                        if (job.status === 'running' && endOffset <= startOffset) endOffset = startOffset + 2;
 
-                      if (job.status === 'running' && endOffset <= startOffset) {
-                        endOffset = startOffset + 2;
-                      }
+                        const leftPercent = (startOffset / totalMins) * 100;
+                        const widthPercent = ((endOffset - startOffset) / totalMins) * 100;
+                        if (widthPercent <= 0) return dandoriElement;
 
-                      const leftPercent = (startOffset / totalMins) * 100;
-                      const widthPercent = ((endOffset - startOffset) / totalMins) * 100;
+                        const completedQty = job.actualQty || 0;
+                        const progress = job.status === 'completed'
+                          ? 1
+                          : Math.min(Math.max(completedQty / job.qtyLot, 0), 1);
+                        const barColor = getJobColor(job.seq);
 
-                      if (widthPercent <= 0) {
-                        return dandoriElement;
-                      }
-
-                      const completedQty = job.actualQty || 0;
-                      const progress = job.status === 'completed'
-                        ? 1
-                        : Math.min(Math.max(completedQty / job.qtyLot, 0), 1);
-                      const barColor = getJobColor(job.seq);
-
-                      const isCompleted = job.status === 'completed';
-                      const textCol = isCompleted ? 'text-white' : 'text-slate-850';
-                      const labelTextCol = isCompleted ? 'text-white/80' : 'text-slate-500';
-                      const shadowCol = isCompleted 
-                        ? 'drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.85)]' 
-                        : 'drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]';
-
-                      return (
-                        <React.Fragment key={`act-group-${job.id}`}>
-                          {dandoriElement}
-                          <div
-                            className="absolute top-0 bottom-0 bg-white border border-slate-355 text-slate-900 flex flex-col items-center justify-center font-mono text-[9px] font-black leading-none overflow-hidden transition-all z-20"
-                            style={{
-                              left: `${leftPercent}%`,
-                              width: `${widthPercent}%`,
-                            }}
-                            title={`Actual Seq ${job.seq}: ${completedQty} / ${job.qtyLot} pcs${
-                              job.status === 'running' && isAbnormalActive ? ' [ABNORMAL]' : 
-                              job.status === 'running' && isNgActive ? ' [NG ONGOING]' : ''
-                            }`}
-                          >
+                        return (
+                          <React.Fragment key={`act-group-${job.id}`}>
+                            {dandoriElement}
+                            {/* Layer 1: white base + color progress fill — NO TEXT */}
                             <div
-                              className="absolute top-0 bottom-0 left-0 transition-all opacity-85"
-                              style={{
-                                width: `${progress * 100}%`,
-                                backgroundColor: barColor,
-                              }}
-                            />
-                            
-                            <div className={`relative z-10 flex flex-col items-center justify-center w-full px-1 ${textCol}`}>
-                              <span className={`text-[8.5px] font-black truncate w-full text-center ${shadowCol}`}>{job.model}</span>
-                              <span className={`text-[7px] mt-0.5 font-extrabold ${labelTextCol} ${shadowCol}`}>
-                                ACT: {completedQty} / {job.qtyLot}
-                              </span>
+                              className="absolute top-0 bottom-0 bg-white border border-slate-200 overflow-hidden z-10"
+                              style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                              title={`Actual Seq ${job.seq}: ${completedQty} / ${job.qtyLot} pcs${
+                                job.status === 'running' && isAbnormalActive ? ' [ABNORMAL]' :
+                                job.status === 'running' && isNgActive ? ' [NG ONGOING]' : ''
+                              }`}
+                            >
+                              <div
+                                className="absolute top-0 bottom-0 left-0 transition-all"
+                                style={{ width: `${progress * 100}%`, backgroundColor: barColor, opacity: 0.85 }}
+                              />
                             </div>
-                          </div>
-                        </React.Fragment>
-                      );
-                    })}
+                          </React.Fragment>
+                        );
+                      })}
 
-                    {lossIntervals.map((interval, idx) => {
-                      const startOff = getMinutesOffset(interval.startTime);
-                      const endOff   = interval.endTime
-                        ? getMinutesOffset(interval.endTime)
-                        : (currentTimeStr ? getMinutesOffset(currentTimeStr) : totalMins);
-                      const duration = Math.max(1, endOff - startOff);
-                      if (duration <= 0) return null;
-                      const leftPct  = (startOff / totalMins) * 100;
-                      const widthPct = (duration  / totalMins) * 100;
-                      const isAbn    = interval.kind === 'abnormal';
-                      const still    = !interval.endTime;
-                      return (
-                        <div
-                          key={`loss-${idx}`}
-                          className={`absolute top-0 bottom-0 z-40 pointer-events-auto transition-all ${
-                            still ? 'animate-pulse' : ''
-                          }`}
-                          style={{
-                            left: `${leftPct}%`,
-                            width: `${widthPct}%`,
-                            backgroundColor: isAbn ? 'rgba(239, 68, 68, 0.75)' : 'rgba(245, 158, 11, 0.75)',
-                          }}
-                          title={`${isAbn ? 'Abnormality' : 'NG Quality'}: ${interval.startTime} - ${interval.endTime || 'Ongoing'} (${duration} mins)\n${interval.note || ''}`}
-                        />
-                      );
-                    })}
+                      {/* Layer 2: Abnormal / NG semi-transparent overlays (on top of bar colors) */}
+                      {lossIntervals.map((interval, idx) => {
+                        const startOff = getMinutesOffset(interval.startTime);
+                        const endOff   = interval.endTime
+                          ? getMinutesOffset(interval.endTime)
+                          : (currentTimeStr ? getMinutesOffset(currentTimeStr) : totalMins);
+                        const duration = Math.max(1, endOff - startOff);
+                        if (duration <= 0) return null;
+                        const leftPct  = (startOff / totalMins) * 100;
+                        const widthPct = (duration / totalMins) * 100;
+                        const isAbn    = interval.kind === 'abnormal';
+                        const still    = !interval.endTime;
+                        return (
+                          <div
+                            key={`loss-${idx}`}
+                            className={`absolute top-0 bottom-0 z-20 transition-all ${still ? 'animate-pulse' : ''}`}
+                            style={{
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              backgroundColor: isAbn ? 'rgba(239, 68, 68, 0.72)' : 'rgba(245, 158, 11, 0.72)',
+                            }}
+                            title={`${isAbn ? 'Abnormality' : 'NG Quality'}: ${interval.startTime} - ${interval.endTime || 'Ongoing'} (${duration} mins)\n${interval.note || ''}`}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* ── Layer 3: Text labels — OUTSIDE overflow-hidden, always on top ── */}
+                    <div className="absolute inset-0 pointer-events-none z-30">
+                      {allShiftJobs.map((job) => {
+                        if (!job.timeRange) return null;
+                        if (job.status === 'queued' || job.status === 'dandori') return null;
+
+                        const isSkipped = job.status === 'completed' &&
+                                          (job.actualQty === undefined || job.actualQty === 0) &&
+                                          !job.actualProductionStart &&
+                                          !job.actualDandoriStart;
+                        if (isSkipped) return null;
+
+                        const actTime = actualTimes[job.id];
+                        if (!actTime) return null;
+
+                        const startOffset = getMinutesOffset(actTime.productionStartStr);
+                        let endOffset = getMinutesOffset(actTime.productionEndStr);
+                        if (job.status === 'running' && endOffset <= startOffset) endOffset = startOffset + 2;
+
+                        const leftPercent = (startOffset / totalMins) * 100;
+                        const widthPercent = ((endOffset - startOffset) / totalMins) * 100;
+                        if (widthPercent <= 0) return null;
+
+                        const completedQty = job.actualQty || 0;
+
+                        return (
+                          <div
+                            key={`act-label-${job.id}`}
+                            className="absolute top-0 bottom-0 flex flex-col items-center justify-center px-1 font-mono leading-none"
+                            style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                          >
+                            <span
+                              className="text-[8.5px] font-black truncate w-full text-center text-white"
+                              style={{ textShadow: '0 0 5px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,1)' }}
+                            >
+                              {job.model}
+                            </span>
+                            <span
+                              className="text-[7px] mt-0.5 font-extrabold text-white/90"
+                              style={{ textShadow: '0 0 4px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,1)' }}
+                            >
+                              ACT: {completedQty} / {job.qtyLot}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                   </div>
                 </div>
               </>

@@ -124,6 +124,29 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
     const [abnormalStartTime, setAbnormalStartTime] = useState('');
     const [ngStartTime, setNgStartTime] = useState('');
 
+    // Restore "sedang diinput" panel state if user navigated away mid-reporting
+    // The machine status 'Dalam Investigasi...' is persisted in context, so we
+    // use it to rehydrate the local UI state on mount / planKey change.
+    useEffect(() => {
+        if (abnormality.isAbnormal && abnormality.type === 'Dalam Investigasi...') {
+            setIsReportingAbnormal(true);
+            if (abnormality.start) setAbnormalStartTime(abnormality.start);
+        } else {
+            setIsReportingAbnormal(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [planKey]);
+
+    useEffect(() => {
+        if (ngState.isNg && ngState.type === 'Dalam Investigasi...') {
+            setIsReportingNg(true);
+            if (ngState.start) setNgStartTime(ngState.start);
+        } else {
+            setIsReportingNg(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [planKey]);
+
     // Live ticking clock for print lock calculations (ticks every 10 seconds)
     const [currentLiveTime, setCurrentLiveTime] = useState<Date>(new Date());
     useEffect(() => {
@@ -334,17 +357,27 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
             const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             setAbnormalStartTime(now);
             setIsReportingAbnormal(true);
+            setMachineAbnormal(
+                machineKey, true, 'Dalam Investigasi...', now, selectedDate,
+                { type: 'abnormal', note: getLogNote(`Abnormal STARTED — jenis sedang diinput`) }
+            );
         }
     };
 
     const handleSaveAbnormalityRecord = () => {
-        if (!abnormality.isAbnormal) {
-            setMachineAbnormal(
-                machineKey, true, selectedAbnType, abnormalStartTime, selectedDate,
-                { type: 'abnormal', note: getLogNote(`Abnormal STARTED: ${selectedAbnType}`) }
-            );
-            setIsReportingAbnormal(false);
-        }
+        setMachineAbnormal(
+            machineKey, true, selectedAbnType, abnormalStartTime, selectedDate,
+            { type: 'abnormal', note: getLogNote(`Abnormal STARTED: ${selectedAbnType}`) }
+        );
+        setIsReportingAbnormal(false);
+    };
+
+    const handleCancelAbnormality = () => {
+        setMachineAbnormal(
+            machineKey, false, '', '', selectedDate,
+            { type: 'success', note: getLogNote(`Abnormal DIBATALKAN`) }
+        );
+        setIsReportingAbnormal(false);
     };
 
     const handleResolveAbnormality = () => {
@@ -377,17 +410,27 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
             const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             setNgStartTime(now);
             setIsReportingNg(true);
+            setMachineNg(
+                machineKey, true, 'Dalam Investigasi...', now, selectedDate,
+                { type: 'ng', note: getLogNote(`NG STARTED — jenis sedang diinput`) }
+            );
         }
     };
 
     const handleSaveNgRecord = () => {
-        if (!ngState.isNg) {
-            setMachineNg(
-                machineKey, true, selectedNgType, ngStartTime, selectedDate,
-                { type: 'ng', note: getLogNote(`NG STARTED: ${selectedNgType}`) }
-            );
-            setIsReportingNg(false);
-        }
+        setMachineNg(
+            machineKey, true, selectedNgType, ngStartTime, selectedDate,
+            { type: 'ng', note: getLogNote(`NG STARTED: ${selectedNgType}`) }
+        );
+        setIsReportingNg(false);
+    };
+
+    const handleCancelNg = () => {
+        setMachineNg(
+            machineKey, false, '', '', selectedDate,
+            { type: 'success', note: getLogNote(`NG DIBATALKAN`) }
+        );
+        setIsReportingNg(false);
     };
 
     const handleResolveNg = () => {
@@ -447,7 +490,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                         <p className="text-[10px] mt-0.5 font-bold">{abnormality.type} — since {abnormality.start}</p>
                     </div>
                     <button onClick={handleResolveAbnormality}
-                        disabled={isReadOnlyMode}
+                        disabled={isReadOnlyMode || isReportingAbnormal}
                         className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-extrabold uppercase tracking-wider cursor-pointer transition-colors border-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-rose-600">
                         Resolve
                     </button>
@@ -462,7 +505,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                         <p className="text-[10px] mt-0.5 font-bold">{ngState.type} — since {ngState.start}</p>
                     </div>
                     <button onClick={handleResolveNg}
-                        disabled={isReadOnlyMode}
+                        disabled={isReadOnlyMode || isReportingNg}
                         className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-extrabold uppercase tracking-wider cursor-pointer transition-colors border-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500">
                         Resolve
                     </button>
@@ -676,33 +719,33 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <button
                                                     onClick={() => setShowPrintModal(true)}
-                                                    disabled={abnormality.isAbnormal || ngState.isNg || isReadOnlyMode}
+                                                    disabled={abnormality.isAbnormal || ngState.isNg || isReadOnlyMode || isReportingAbnormal || isReportingNg}
                                                     className="py-3 px-4 bg-[#037233] hover:bg-[#025c28] text-white font-extrabold uppercase tracking-wider text-xs rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#037233]"
                                                 >
                                                     <Printer className="w-4 h-4" /> Print Custom Label (Kanban)
                                                 </button>
                                                 <button
                                                     onClick={abnormality.isAbnormal ? handleResolveAbnormality : handleReportAbnormality}
-                                                    disabled={(ngState.isNg && !abnormality.isAbnormal) || isReadOnlyMode}
-                                                    className="py-3 px-4 bg-white hover:bg-rose-50 dark:bg-slate-900 border-2 border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-450 font-extrabold uppercase tracking-wider text-xs rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-950 dark:disabled:border-slate-800"
+                                                    disabled={isReadOnlyMode || isReportingAbnormal || isReportingNg || (ngState.isNg && !abnormality.isAbnormal)}
+                                                    className="py-3 px-4 bg-white hover:bg-rose-50 dark:bg-slate-900 border-2 border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-455 font-extrabold uppercase tracking-wider text-xs rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-950 dark:disabled:border-slate-800"
                                                 >
-                                                    <AlertTriangle className="w-4 h-4" /> {abnormality.isAbnormal ? 'Resolve Abnormality' : 'Report Abnormality'}
+                                                    <AlertTriangle className="w-4 h-4" /> {abnormality.isAbnormal ? (isReportingAbnormal ? 'Under Investigation' : 'Resolve Abnormality') : 'Report Abnormality'}
                                                 </button>
                                             </div>
 
                                             {/* Orange report NG full-width */}
                                             <button
                                                 onClick={ngState.isNg ? handleResolveNg : handleReportNg}
-                                                disabled={(abnormality.isAbnormal && !ngState.isNg) || isReadOnlyMode}
+                                                disabled={isReadOnlyMode || isReportingNg || isReportingAbnormal || (abnormality.isAbnormal && !ngState.isNg)}
                                                 className="w-full py-3 bg-white hover:bg-amber-50/50 dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-900/50 text-amber-700 dark:text-amber-450 font-extrabold uppercase tracking-wider text-xs rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-950 dark:disabled:border-slate-800"
                                             >
-                                                <AlertCircle className="w-4 h-4" /> {ngState.isNg ? 'Resolve NG Issue' : 'Report NG (Quality Issue Ongoing)'}
+                                                <AlertCircle className="w-4 h-4" /> {ngState.isNg ? (isReportingNg ? 'Under Investigation' : 'Resolve NG Issue') : 'Report NG (Quality Issue Ongoing)'}
                                             </button>
 
                                             {/* Blue complete production full-width */}
                                             <button
                                                 onClick={() => handleOpenSignOff(activeJob)}
-                                                disabled={isReadOnlyMode}
+                                                disabled={isReadOnlyMode || abnormality.isAbnormal || ngState.isNg || isReportingAbnormal || isReportingNg}
                                                 className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest text-sm rounded-[4px] transition-all hover:-translate-y-0.5 cursor-pointer border-0 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 disabled:hover:-translate-y-0"
                                             >
                                                 <CheckCircle2 className="w-5 h-5" /> Complete Production
@@ -842,12 +885,15 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
 
                             {isReportingAbnormal && (
                                 <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/40 animate-in slide-in-from-top-2 shrink-0">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-bold text-rose-800 dark:text-rose-450 text-xs uppercase">New Abnormality Record</h4>
-                                        <button onClick={() => setIsReportingAbnormal(false)} className="text-rose-500 hover:text-rose-700 cursor-pointer">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h4 className="font-bold text-rose-800 dark:text-rose-450 text-xs uppercase">Catat Jenis Abnormal ke Log</h4>
+                                        <button onClick={handleCancelAbnormality} className="text-rose-500 hover:text-rose-700 cursor-pointer">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
+                                    <p className="text-[9px] text-rose-600 dark:text-rose-500 mb-3 font-medium">
+                                        ⚠️ Status mesin sudah berubah. Pilih jenis untuk dicatat di activity log.
+                                    </p>
                                     <div className="space-y-3">
                                         <div>
                                             <label className="block text-[9px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-500 mb-1">Tipe Abnormal</label>
@@ -856,22 +902,31 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                                 {ABNORMAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
-                                        <button onClick={handleSaveAbnormalityRecord}
-                                            className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
-                                            Save Record
-                                        </button>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={handleSaveAbnormalityRecord}
+                                                className="py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
+                                                Simpan Jenis
+                                            </button>
+                                            <button onClick={handleCancelAbnormality}
+                                                className="py-2 bg-white dark:bg-slate-900 hover:bg-rose-50 border border-rose-350 dark:border-rose-900 text-rose-700 dark:text-rose-455 rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
+                                                Batal
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
                             {isReportingNg && (
                                 <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/40 animate-in slide-in-from-top-2 shrink-0">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-bold text-amber-800 dark:text-amber-450 text-xs uppercase">New NG Record</h4>
-                                        <button onClick={() => setIsReportingNg(false)} className="text-amber-500 hover:text-amber-700 cursor-pointer">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h4 className="font-bold text-amber-800 dark:text-amber-455 text-xs uppercase">Catat Jenis NG ke Log</h4>
+                                        <button onClick={handleCancelNg} className="text-amber-500 hover:text-amber-700 cursor-pointer">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
+                                    <p className="text-[9px] text-amber-600 dark:text-amber-500 mb-3 font-medium">
+                                        ⚠️ Status mesin sudah berubah. Pilih jenis untuk dicatat di activity log.
+                                    </p>
                                     <div className="space-y-3">
                                         <div>
                                             <label className="block text-[9px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-500 mb-1">Tipe NG</label>
@@ -880,10 +935,16 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                                 {NG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
-                                        <button onClick={handleSaveNgRecord}
-                                            className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
-                                            Save Record
-                                        </button>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={handleSaveNgRecord}
+                                                className="py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
+                                                Simpan Jenis
+                                            </button>
+                                            <button onClick={handleCancelNg}
+                                                className="py-2 bg-white dark:bg-slate-900 hover:bg-amber-50 border border-amber-350 dark:border-amber-800 text-amber-700 dark:text-amber-400 rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm">
+                                                Batal
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -897,10 +958,10 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                         const isNgLog = entry.type === 'ng' || (entry.message || '').toUpperCase().includes('[NG');
                                         const logColor =
                                             isAbnormalLog
-                                                ? 'text-rose-600 dark:text-rose-455 font-bold'
+                                                ? 'text-rose-600 dark:text-rose-400 font-bold'
                                                 : isNgLog
-                                                    ? 'text-amber-600 dark:text-amber-455 font-bold'
-                                                    : 'text-emerald-650 dark:text-emerald-400 font-bold';
+                                                    ? 'text-amber-600 dark:text-amber-400 font-bold'
+                                                    : 'text-emerald-600 dark:text-emerald-400 font-bold';
                                         return (
                                             <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5">
                                                 <span className="text-[9px] font-mono text-slate-400 shrink-0 mt-0.5">{entry.time}</span>
