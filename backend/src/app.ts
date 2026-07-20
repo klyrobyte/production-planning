@@ -18,6 +18,7 @@ import { historyOrdersRoutes } from './modules/history-orders/history-orders.rou
 import { createProductionPlansRoutes } from './modules/production-plans/production-plans.routes';
 import { globalLogsRoutes } from './modules/global-logs/global-logs.routes';
 import { siteConfigRoutes } from './modules/site-config/site-config.routes';
+import { btPrintersRoutes } from './modules/bt-printers/bt-printers.routes';
 
 // Creates and configures the Express app
 export const createApp = () => {
@@ -48,6 +49,7 @@ export const createApp = () => {
   app.use('/api/production-plans',  createProductionPlansRoutes());
   app.use('/api/global-logs',       globalLogsRoutes);
   app.use('/api/site-config',       siteConfigRoutes);
+  app.use('/api/bt-printers',       btPrintersRoutes);
 
   // Health check — useful for Docker and uptime monitors
   app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
