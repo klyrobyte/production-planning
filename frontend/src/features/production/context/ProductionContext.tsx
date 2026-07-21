@@ -35,6 +35,10 @@ export interface Job {
   downtimeMinutes?: number;
   closedNgQty?: number;
   closedOkQty?: number;
+  needsFinalDandori?: boolean;
+  finalDandoriCompleted?: boolean;
+  finalDandoriStart?: string;
+  finalDandoriEnd?: string;
 }
 
 export interface AbnormalityLog {
@@ -71,8 +75,8 @@ interface ProductionContextType {
   fetchPlans: () => Promise<void>;
   initializeMachineIfEmpty: (machineId: string, dateStr: string, parts: any[]) => void;
   incrementJobProgress: (machineId: string, jobId: string, qty: number, dateStr: string, parts: any[], logMessage?: { type: string; note: string }) => void;
-  updateJobStatus: (machineId: string, jobId: string, action: 'complete-running' | 'complete-dandori', dateStr: string, parts: any[], logMessage?: { type: string; note: string }, closedNgQty?: number, closedOkQty?: number) => void;
-  closeShiftProduction: (machineId: string, shift: 'day' | 'night', dateStr: string) => void;
+  updateJobStatus: (machineId: string, jobId: string, action: 'complete-running' | 'complete-dandori' | 'complete-final-dandori', dateStr?: string, parts?: any[], logMessage?: { type: string; note: string }, closedNgQty?: number, closedOkQty?: number) => void;
+  closeShiftProduction: (machineId: string, shift: 'day' | 'night', dateStr: string, userInitials?: string, machineDisplayName?: string, autoFinalize?: boolean) => void;
   addJobDowntime: (machineId: string, jobId: string, downtimeMins: number, dateStr: string, logMessage?: { type: string; note: string }) => void;
   setMachineAbnormal: (machineId: string, isAbnormal: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }, downtimeMins?: number, downtimeJobId?: string) => void;
   setMachineNg: (machineId: string, isNg: boolean, type?: string, start?: string, dateStr?: string, logMessage?: { type: string; note: string; timeStr?: string }) => void;
@@ -209,10 +213,20 @@ const recalculateTimelineHelper = (items: Job[]): Job[] => {
     const spansOffHours = elapsedMins > item.time;
     let status = item.status;
     if (status !== 'completed' && status !== 'running') {
-      if (index === firstDayIdx || index === firstNightIdx) {
+      const dayJobs = items.filter(j => j.shift === 'day');
+      const isDayShiftClosedOrDone = dayJobs.length === 0 || dayJobs.every(j => j.status === 'completed' && (!j.needsFinalDandori || j.finalDandoriCompleted));
+
+      if (index === firstDayIdx) {
         status = 'dandori';
+      } else if (index === firstNightIdx) {
+        status = isDayShiftClosedOrDone ? 'dandori' : 'queued';
       } else if (index > 0 && items[index - 1].status === 'completed') {
-        status = 'dandori';
+        const prevJob = items[index - 1];
+        if (prevJob.shift === item.shift) {
+          status = 'dandori';
+        } else {
+          status = isDayShiftClosedOrDone ? 'dandori' : 'queued';
+        }
       } else {
         status = 'queued';
       }
@@ -971,31 +985,74 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       const updated = [...list];
       const nowTimeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       if (action === 'complete-running') {
+        const closedNg = closedNgQty ?? updated[idx].closedNgQty ?? 0;
+        const defaultOk = Math.max(0, (updated[idx].actualQty || 0) - closedNg);
+        const closedOk = closedOkQty !== undefined ? closedOkQty : defaultOk;
+
+        const remainingInShift = updated.filter((j, fIdx) => fIdx > idx && j.shift === updated[idx].shift && j.status !== 'completed');
+        const isLastInShift = remainingInShift.length === 0;
+
         const completedJob = {
           ...updated[idx],
           status: 'completed' as const,
           actualProductionEnd: nowTimeStr,
-          closedNgQty: closedNgQty ?? updated[idx].closedNgQty,
-          closedOkQty: closedOkQty ?? (closedOkQty !== undefined ? closedOkQty : updated[idx].actualQty),
+          actualQty: closedOk,
+          closedNgQty: closedNg,
+          closedOkQty: closedOk,
+          needsFinalDandori: isLastInShift ? true : updated[idx].needsFinalDandori,
+          finalDandoriCompleted: isLastInShift ? false : updated[idx].finalDandoriCompleted,
+          finalDandoriStart: isLastInShift ? (updated[idx].finalDandoriStart || nowTimeStr) : updated[idx].finalDandoriStart
         };
         updated[idx] = completedJob;
-        const shortage = completedJob.qtyLot - completedJob.actualQty;
-        if (shortage !== 0) {
-          const nextSameIdx = updated.findIndex((j, fIdx) => fIdx > idx && j.model === completedJob.model && j.status !== 'completed');
-          if (nextSameIdx !== -1) {
-            const targetJob = updated[nextSameIdx];
-            const newQtyLot = Math.max(0, targetJob.qtyLot + shortage);
-            const cavity = targetJob.kav || 1;
-            const ct = targetJob.ct || 60;
-            const newTime = Math.round(((newQtyLot / cavity) * ct) / 60);
-            updated[nextSameIdx] = {
-              ...targetJob,
-              qtyLot: newQtyLot,
-              time: newTime
-            };
+
+        const shortage = completedJob.qtyLot - closedOk;
+        if (shortage > 0) {
+          // Carry over remaining target ONLY if it is Day shift
+          if (completedJob.shift === 'day') {
+            const nextSameIdx = updated.findIndex((j, fIdx) => fIdx > idx && j.model === completedJob.model && j.status !== 'completed');
+            if (nextSameIdx !== -1) {
+              const targetJob = updated[nextSameIdx];
+              const newQtyLot = targetJob.qtyLot + shortage;
+              const cavity = targetJob.kav || 1;
+              const ct = targetJob.ct || 60;
+              const newTime = Math.round(((newQtyLot / cavity) * ct) / 60);
+              updated[nextSameIdx] = {
+                ...targetJob,
+                qtyLot: newQtyLot,
+                time: newTime
+              };
+            } else {
+              // Create a carryover job into Night shift for this model
+              const cavity = completedJob.kav || 1;
+              const ct = completedJob.ct || 60;
+              const newTime = Math.round(((shortage / cavity) * ct) / 60);
+              const carryJob: Job = {
+                ...completedJob,
+                id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+                qtyLot: shortage,
+                actualQty: 0,
+                closedNgQty: 0,
+                closedOkQty: 0,
+                status: 'queued',
+                shift: 'night',
+                time: newTime,
+                actualProductionStart: undefined,
+                actualProductionEnd: undefined,
+                actualDandoriStart: undefined,
+                actualDandoriEnd: undefined,
+                downtimeMinutes: 0
+              };
+              const firstNightIdx = updated.findIndex(j => j.shift === 'night');
+              if (firstNightIdx !== -1) {
+                updated.splice(firstNightIdx, 0, carryJob);
+              } else {
+                updated.push(carryJob);
+              }
+            }
           }
+          // Night shift jobs (shift === 'night'): shortage is NOT carried over to next day!
         }
-        if (idx + 1 < updated.length) {
+        if (idx + 1 < updated.length && updated[idx + 1].shift === updated[idx].shift) {
           updated[idx + 1] = {
             ...updated[idx + 1],
             status: 'dandori',
@@ -1008,6 +1065,15 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
           status: 'running',
           actualDandoriEnd: nowTimeStr,
           actualProductionStart: nowTimeStr
+        };
+      } else if (action === 'complete-final-dandori') {
+        const startStr = updated[idx].finalDandoriStart || updated[idx].actualProductionEnd || nowTimeStr;
+        updated[idx] = {
+          ...updated[idx],
+          needsFinalDandori: true,
+          finalDandoriCompleted: true,
+          finalDandoriStart: startStr,
+          finalDandoriEnd: nowTimeStr
         };
       }
       const solved = recalculateTimelineHelper(updated);
@@ -1026,43 +1092,61 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
   };
 
   // Closes out scheduled jobs for a specific shift in one batch action
-  const closeShiftProduction = (machineId: string, shift: 'day' | 'night', dateStr: string) => {
+  const closeShiftProduction = (
+    machineId: string,
+    shift: 'day' | 'night',
+    dateStr: string,
+    userInitials: string = 'SU',
+    machineDisplayName?: string,
+    _autoFinalize: boolean = true
+  ) => {
     const finalKey = `${dateStr}_${machineId}`;
     lastLocalWriteRef.current[finalKey] = Date.now();
     const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const recordDate = new Date().toLocaleDateString();
-    const newRecord = {
-      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      machineId,
-      date: recordDate,
-      time,
-      type: 'success',
-      message: `[SHIFT CLOSED] ${shift.toUpperCase()} shift production closed. Unfinished target carried over.`
-    };
-    const nextLogs = [newRecord, ...(logs[finalKey] || [])];
-    setLogs(prev => ({ ...prev, [finalKey]: nextLogs }));
-    
+
     const list = machineJobs[finalKey] || [];
+    const shiftJobs = list.filter(j => j.shift === shift);
+    const mName = machineDisplayName || `MC ${machineId}`;
+
+    if (shiftJobs.length === 0) return;
+
+    const shiftClosedKey = `[SHIFT CLOSED] Penutupan produksi shift ${shift.toUpperCase()}`;
+    const alreadyClosed = (logs[finalKey] || []).some(l => l.message && l.message.includes(shiftClosedKey));
+    const allCompletedInShift = shiftJobs.every(j => j.status === 'completed' && (j.finalDandoriCompleted || !j.needsFinalDandori));
+
+    if (alreadyClosed && allCompletedInShift) {
+      return;
+    }
+
+    const lastJobInShift = shiftJobs[shiftJobs.length - 1];
+    let nextLogs = [...(logs[finalKey] || [])];
+
     const carriedOverJobs: Job[] = [];
-    
+
+    // 1. Auto-complete jobs & track shortage carryover
     const updated = list.map(j => {
-      if (j.shift === shift && j.status !== 'completed') {
-        const remainingQty = j.qtyLot - (j.actualQty || 0);
-        if (remainingQty > 0) {
-          const nextShift = shift === 'day' ? 'night' : 'day';
+      if (j.shift === shift) {
+        const closedNg = j.closedNgQty || 0;
+        const effectiveOk = j.closedOkQty !== undefined ? j.closedOkQty : Math.max(0, (j.actualQty || 0) - closedNg);
+        const hasStarted = !!j.actualProductionStart;
+        const isLast = j.id === lastJobInShift.id;
+        const remainingQty = j.qtyLot - effectiveOk;
+
+        if (remainingQty > 0 && shift === 'day') {
           const cavity = j.kav || 1;
           const ct = j.ct || 60;
           const newTime = Math.round(((remainingQty / cavity) * ct) / 60);
 
           carriedOverJobs.push({
             ...j,
-            id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+            id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             qtyLot: remainingQty,
             actualQty: 0,
             closedNgQty: 0,
             closedOkQty: 0,
             status: 'queued',
-            shift: nextShift,
+            shift: 'night',
             time: newTime,
             actualProductionStart: undefined,
             actualProductionEnd: undefined,
@@ -1071,18 +1155,80 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
             downtimeMinutes: 0
           });
         }
-        const hasStarted = !!j.actualProductionStart;
+
+        if (j.status !== 'completed') {
+          const autoLog = {
+            id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            machineId,
+            date: recordDate,
+            time,
+            type: 'info',
+            message: `[AUTO-COMPLETE] Job ${j.model} diselesaikan otomatis di akhir shift ${shift.toUpperCase()}. OK: ${effectiveOk}, NG: ${closedNg}. (${userInitials})`
+          };
+          nextLogs.unshift(autoLog);
+        }
+
         return {
           ...j,
+          actualQty: effectiveOk,
+          closedOkQty: effectiveOk,
+          closedNgQty: closedNg,
           status: 'completed' as const,
-          actualProductionEnd: hasStarted ? (j.actualProductionEnd || time) : undefined
+          actualProductionEnd: hasStarted ? (j.actualProductionEnd || time) : undefined,
+          needsFinalDandori: isLast ? true : j.needsFinalDandori,
+          finalDandoriCompleted: true,
+          finalDandoriStart: isLast ? (j.finalDandoriStart || j.actualProductionEnd || time) : j.finalDandoriStart,
+          finalDandoriEnd: isLast ? (j.finalDandoriEnd || time) : j.finalDandoriEnd
         };
       }
       return j;
     });
 
+    // 2. Guarantee mandatory [SUCCESS] Dandori Akhir Shift log for this shift
+    const logNoteText = `Dandori Akhir Shift selesai untuk mesin ${mName}. (${userInitials})`;
+    const existingFinalLog = nextLogs.find(l => l.message && l.message.includes(`Dandori Akhir Shift selesai untuk mesin`));
+    if (!existingFinalLog || existingFinalLog.time !== time) {
+      const finalDandoriLog = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: 'success',
+        message: `[SUCCESS] ${logNoteText}`
+      };
+      nextLogs.unshift(finalDandoriLog);
+    }
+
+    // 3. Shift closed log (unless already present)
+    if (!alreadyClosed) {
+      const shiftClosedLog = {
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        machineId,
+        date: recordDate,
+        time,
+        type: 'success',
+        message: `[SHIFT CLOSED] Penutupan produksi shift ${shift.toUpperCase()} selesai.${shift === 'day' ? ' Sisa target ditransfer ke shift malam.' : ' Shift malam selesai.'} (${userInitials})`
+      };
+      nextLogs.unshift(shiftClosedLog);
+    }
+
+    // Deduplicate any repeated [SHIFT CLOSED] entries in nextLogs
+    const deduplicatedLogs: AbnormalityLog[] = [];
+    const seenShiftClosedMsg = new Set<string>();
+    for (const logItem of nextLogs) {
+      if (logItem.message && logItem.message.includes('[SHIFT CLOSED] Penutupan produksi shift')) {
+        if (seenShiftClosedMsg.has(logItem.message)) {
+          continue; // skip duplicate log entry
+        }
+        seenShiftClosedMsg.add(logItem.message);
+      }
+      deduplicatedLogs.push(logItem);
+    }
+
+    setLogs(prev => ({ ...prev, [finalKey]: deduplicatedLogs }));
+
     let solved = recalculateTimelineHelper(updated);
-    
+
     if (shift === 'day' && carriedOverJobs.length > 0) {
       const firstNightIdx = solved.findIndex(j => j.shift === 'night');
       if (firstNightIdx !== -1) {
@@ -1097,7 +1243,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     setMachineJobs(prev => ({ ...prev, [finalKey]: solved }));
     savePlanToDatabase(
       finalKey, 'daily', machineId, dateStr, solved,
-      dayOTs[finalKey] || 'teiji', nightOTs[finalKey] || 'teiji', nextLogs
+      dayOTs[finalKey] || 'teiji', nightOTs[finalKey] || 'teiji', deduplicatedLogs
     );
 
     if (shift === 'night' && carriedOverJobs.length > 0) {
@@ -1108,7 +1254,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       const nextMm = String(nextDate.getMonth() + 1).padStart(2, '0');
       const nextDd = String(nextDate.getDate()).padStart(2, '0');
       const nextDateStr = `${nextYyyy}-${nextMm}-${nextDd}`;
-      
+
       const nextKey = `${nextDateStr}_${machineId}`;
       setMachineJobs(prev => {
         const nextList = prev[nextKey] || [];
@@ -1121,12 +1267,12 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         }
         nextUpdated.forEach((j, idx) => { j.seq = idx + 1; });
         const nextSolved = recalculateTimelineHelper(nextUpdated);
-        
+
         savePlanToDatabase(
           nextKey, 'daily', machineId, nextDateStr, nextSolved,
           dayOTs[nextKey] || 'teiji', nightOTs[nextKey] || 'teiji', logs[nextKey] || []
         );
-        
+
         return { ...prev, [nextKey]: nextSolved };
       });
     }

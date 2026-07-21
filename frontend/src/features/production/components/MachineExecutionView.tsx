@@ -61,7 +61,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
     const planKey = `${selectedDate}_${machineKey}`;
 
     const {
-        machineJobs, activeAbnormalities, activeNgs, logs,
+        machineJobs, activeAbnormalities, activeNgs, logs, dayOTs, nightOTs,
         updateJobStatus, setMachineAbnormal, setMachineNg,
         incrementJobProgress, closeShiftProduction,
     } = useProduction();
@@ -78,9 +78,11 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         return name.trim().split(' ').map(n => n[0]).join('').substring(0, 3).toUpperCase();
     };
 
+    const userInitials = memberName ? getInitials(memberName) : (activePortal === 'member' ? 'MB' : activePortal.substring(0, 2).toUpperCase());
+    const mName = machine || `MC ${machineKey}`;
+
     const getLogNote = (baseNote: string) => {
-        const initials = memberName ? getInitials(memberName) : (activePortal === 'member' ? 'MB' : activePortal.substring(0, 2).toUpperCase());
-        return initials ? `${baseNote} (${initials})` : baseNote;
+        return userInitials ? `${baseNote} (${userInitials})` : baseNote;
     };
 
     // Bluetooth pairing requirement & dev mode bypass
@@ -98,6 +100,8 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
     const abnormality = activeAbnormalities[planKey] ?? { isAbnormal: false, type: '', start: '' };
     const ngState = activeNgs[planKey] ?? { isNg: false, type: '', start: '' };
     const logList = logs[planKey] || [];
+    const dayOT = dayOTs[planKey] || 'teiji';
+    const nightOT = nightOTs[planKey] || 'teiji';
 
     const { data: partsData = [] } = useQuery<any[]>({
         queryKey: ['parts'],
@@ -235,6 +239,15 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         if (!activeJob || activeJob.status !== 'running') {
             return { isLocked: false, message: '' };
         }
+
+        // Guard: if target lot already reached (e.g. 10/10), lock printing
+        if (activeJob.qtyLot > 0 && activeJob.actualQty >= activeJob.qtyLot) {
+            return {
+                isLocked: true,
+                message: `Target Lot Selesai: Produksi telah mencapai target (${activeJob.actualQty}/${activeJob.qtyLot} pcs). Pencetakan label Kanban dikunci karena lot sudah memenuhi target.`
+            };
+        }
+
         // Guard: if no production start time recorded yet, don't lock
         if (!activeJob.actualProductionStart || typeof activeJob.actualProductionStart !== 'string') {
             return { isLocked: false, message: '' };
@@ -304,9 +317,57 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         return { isLocked, message };
     }, [activeJob, currentLiveTime, abnormality, ngState]);
 
+    const shiftStartStatus = useMemo(() => {
+        if (!activeJob) return { isBeforeStart: false, startTimeStr: '' };
+
+        const rangeParts = (activeJob.timeRange || '').split('-').map(s => s.trim());
+        if (!rangeParts[0] || !rangeParts[0].includes(':')) {
+            return { isBeforeStart: false, startTimeStr: '' };
+        }
+
+        const startTimeStr = rangeParts[0];
+        const [startHStr, startMStr] = startTimeStr.split(':');
+        const startH = parseInt(startHStr, 10);
+        const startM = parseInt(startMStr, 10);
+
+        const scheduledStart = new Date(selectedDate + 'T00:00:00');
+        scheduledStart.setHours(startH, startM, 0, 0);
+
+        const isBeforeStart = currentLiveTime.getTime() < scheduledStart.getTime();
+
+        return { isBeforeStart, startTimeStr };
+    }, [activeJob, selectedDate, currentLiveTime]);
+
+    const finalDandoriJob = useMemo(() => {
+        if (activeJob) return null;
+
+        const dayJobs = jobs.filter(j => j.shift === 'day');
+        const nightJobs = jobs.filter(j => j.shift === 'night');
+
+        if (dayJobs.length > 0 && dayJobs.every(j => j.status === 'completed')) {
+            const lastDayJob = dayJobs[dayJobs.length - 1];
+            if (lastDayJob.needsFinalDandori && !lastDayJob.finalDandoriCompleted) {
+                return lastDayJob;
+            }
+        }
+
+        if (nightJobs.length > 0 && nightJobs.every(j => j.status === 'completed')) {
+            const lastNightJob = nightJobs[nightJobs.length - 1];
+            if (lastNightJob.needsFinalDandori && !lastNightJob.finalDandoriCompleted) {
+                return lastNightJob;
+            }
+        }
+
+        return null;
+    }, [jobs, activeJob]);
+
     // Handlers
     const handleCompleteDandori = () => {
         if (!activeJob) return;
+        if (shiftStartStatus.isBeforeStart && activePortal === 'member') {
+            alert(`⚠️ BELUM MASUK WAKTU SHIFT!\n\nJadwal start shift/dandori adalah pukul ${shiftStartStatus.startTimeStr}. Persiapan/dandori tidak dapat diselesaikan sebelum masuk jam tersebut.`);
+            return;
+        }
         if (activePortal === 'member' && !isBtReadyForProduction) {
             alert("⚠️ SAMBUNGAN PRINTER BLUETOOTH WAJIB TERHUBUNG!\n\nPrinter Bluetooth belum ter-pair. Silakan klik 'Pair Bluetooth Printer' di panel sebelah kanan sebelum memulai produksi, atau aktifkan 'Dev Mode Bypass'.");
             return;
@@ -315,6 +376,70 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
             type: 'success', note: getLogNote(`Dandori selesai untuk ${activeJob.model}.`)
         });
     };
+
+    const handleCompleteFinalDandori = (jobId: string) => {
+        updateJobStatus(machineKey, jobId, 'complete-final-dandori', selectedDate, partsData, {
+            type: 'success', note: getLogNote(`Dandori Akhir Shift selesai untuk mesin ${mName}.`)
+        });
+    };
+
+    // Auto-finalize shift ONLY if live time reaches or exceeds actual shift end time (16:30/21:00 for Day, 05:00/07:15 for Night)
+    useEffect(() => {
+        if (isReadOnlyMode) return;
+        const todayDate = getTodayDateString();
+        if (selectedDate !== todayDate) return; // Only auto-close shift for TODAY's date!
+
+        const dayJobs = jobs.filter(j => j.shift === 'day');
+        const nightJobs = jobs.filter(j => j.shift === 'night');
+
+        // Check Day Shift expiration (End of Day Shift: 16:30 for Teiji, 21:00 for OT)
+        if (dayJobs.length > 0) {
+            const dayEndStr = dayOT === 'ot' ? '21:00' : '16:30';
+            const [h, m] = dayEndStr.split(':').map(n => parseInt(n, 10));
+            const dayEndClock = new Date(selectedDate + 'T00:00:00');
+            dayEndClock.setHours(h, m, 0, 0);
+
+            const isDayShiftPending = dayJobs.some(j => j.status !== 'completed' || !j.finalDandoriCompleted);
+            if (currentLiveTime.getTime() >= dayEndClock.getTime() && isDayShiftPending) {
+                if (abnormality.isAbnormal) {
+                    setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
+                        type: 'success', note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`
+                    });
+                }
+                if (ngState.isNg) {
+                    setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
+                        type: 'success', note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`
+                    });
+                }
+                closeShiftProduction(machineKey, 'day', selectedDate, userInitials, mName, true);
+            }
+        }
+
+        // Check Night Shift expiration (End of Night Shift: 05:00 for Teiji, 07:15 for OT next morning)
+        if (nightJobs.length > 0) {
+            const nightEndStr = nightOT === 'ot' ? '07:15' : '05:00';
+            const [h, m] = nightEndStr.split(':').map(n => parseInt(n, 10));
+            const nightEndClock = new Date(selectedDate + 'T00:00:00');
+            // Night shift ends on the next morning
+            nightEndClock.setDate(nightEndClock.getDate() + 1);
+            nightEndClock.setHours(h, m, 0, 0);
+
+            const isNightShiftPending = nightJobs.some(j => j.status !== 'completed' || !j.finalDandoriCompleted);
+            if (currentLiveTime.getTime() >= nightEndClock.getTime() && isNightShiftPending) {
+                if (abnormality.isAbnormal) {
+                    setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
+                        type: 'success', note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`
+                    });
+                }
+                if (ngState.isNg) {
+                    setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
+                        type: 'success', note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`
+                    });
+                }
+                closeShiftProduction(machineKey, 'night', selectedDate, userInitials, mName, true);
+            }
+        }
+    }, [currentLiveTime, jobs, selectedDate, machineKey, mName, abnormality.isAbnormal, ngState.isNg, dayOT, nightOT, userInitials, isReadOnlyMode, closeShiftProduction, setMachineAbnormal, setMachineNg]);
 
     const handleOpenSignOff = (job: Job) => {
         setSignOffJobId(job.id);
@@ -637,8 +762,24 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                         </div>
 
                                         <div className="w-full max-w-2xl flex flex-col gap-3">
+                                            {shiftStartStatus.isBeforeStart && (
+                                                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3.5 text-amber-800 dark:text-amber-400 text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-pulse shrink-0" />
+                                                        <span>
+                                                            Waktu shift/dandori belum dimulai (Jadwal start: <strong className="font-black text-amber-900 dark:text-amber-300 font-mono">{shiftStartStatus.startTimeStr}</strong>). Tombol Finish Preparation dikunci hingga waktu tiba.
+                                                        </span>
+                                                    </div>
+                                                    {activePortal !== 'member' && (
+                                                        <span className="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 px-2 py-0.5 rounded shrink-0 ml-2">
+                                                            Leader Bypass
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <button onClick={handleCompleteDandori}
-                                                disabled={isReadOnlyMode}
+                                                disabled={isReadOnlyMode || (shiftStartStatus.isBeforeStart && activePortal === 'member')}
                                                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-750 text-white rounded-[4px] font-black uppercase tracking-widest text-sm transition-all shadow-md flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600">
                                                 <CheckCircle2 className="w-5 h-5" /> {isFirstInShift ? "Finish Shift Preparation" : "Finish Dandori Setup"}
                                             </button>
@@ -763,13 +904,43 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-10 flex flex-col items-center justify-center text-slate-400 gap-3 shadow-sm">
-                            <Clock className="w-10 h-10 text-slate-300" />
-                            <p className="text-sm font-black uppercase tracking-wider">No Active Job</p>
-                            <p className="text-xs font-medium">Semua job sudah selesai atau belum ada jadwal hari ini.</p>
+                    ) : finalDandoriJob ? (
+                        <div className="bg-white dark:bg-slate-950 border-2 border-indigo-500/40 dark:border-indigo-500/30 rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden animate-in fade-in">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-3 shadow-sm">
+                                <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
+                            </div>
+
+                            <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200/80 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300 rounded-full text-[10px] font-black uppercase tracking-wider mb-2">
+                                🧹 Dandori Akhir Shift ({finalDandoriJob.shift?.toUpperCase()} SHIFT)
+                            </span>
+
+                            <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-1">
+                                Pembersihan Mesin & Dandori Akhir Shift
+                            </h3>
+
+                            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md leading-relaxed mb-6 font-medium">
+                                Part terakhir (<strong className="font-mono text-slate-700 dark:text-slate-300">{finalDandoriJob.model}</strong>) di shift {finalDandoriJob.shift?.toUpperCase()} telah selesai diproduksi. Lakukan pembersihan mold, merapikan area kerja, dan selesaikan Dandori Akhir Shift sebelum menekan tombol <strong className="text-slate-700 dark:text-slate-300">Close Shift Production</strong>.
+                            </p>
+
+                            <div className="w-full max-w-md flex flex-col gap-3">
+                                <button onClick={() => handleCompleteFinalDandori(finalDandoriJob.id)}
+                                    disabled={isReadOnlyMode}
+                                    className="w-full py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-[4px] font-black uppercase tracking-widest text-sm transition-all shadow-md flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <CheckCircle2 className="w-5 h-5" /> Selesaikan Dandori Akhir Shift
+                                </button>
+
+                                <div className="space-y-1">
+                                    <button onClick={() => {
+                                        closeShiftProduction(machineKey, finalDandoriJob.shift === 'night' ? 'night' : 'day', selectedDate, userInitials, mName, true);
+                                    }}
+                                        disabled={isReadOnlyMode}
+                                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold uppercase tracking-wider text-xs rounded transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Close {finalDandoriJob.shift?.toUpperCase()} Shift Production
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Up Next in Queue */}
                     <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -953,7 +1124,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                                 {logList.length === 0 ? (
                                     <p className="py-8 text-center text-[11px] text-slate-400 font-bold uppercase tracking-wider">Belum ada aktivitas</p>
                                 ) : (
-                                    logList.slice(0, 50).map(entry => {
+                                    logList.map(entry => {
                                         const isAbnormalLog = entry.type === 'abnormal' || (entry.message || '').toUpperCase().includes('[ABNORMAL');
                                         const isNgLog = entry.type === 'ng' || (entry.message || '').toUpperCase().includes('[NG');
                                         const logColor =
@@ -1005,7 +1176,16 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">NG Qty</label>
-                                    <input type="number" min={0} value={signOffNgQty} onChange={e => setSignOffNgQty(e.target.value)}
+                                    <input type="number" min={0} value={signOffNgQty} 
+                                        onChange={e => {
+                                            const ngVal = e.target.value;
+                                            setSignOffNgQty(ngVal);
+                                            const ng = parseInt(ngVal) || 0;
+                                            const currentJob = jobs.find(j => j.id === signOffJobId);
+                                            const totalActual = currentJob?.actualQty !== undefined && currentJob.actualQty > 0 ? currentJob.actualQty : (currentJob?.qtyLot || 0);
+                                            const ok = Math.max(0, totalActual - ng);
+                                            setSignOffOkQty(String(ok));
+                                        }}
                                         className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-slate-950 dark:text-white outline-none focus:border-[#E76114]" />
                                 </div>
                                 <div className="space-y-1">

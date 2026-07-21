@@ -345,17 +345,6 @@ export default function ProductionPage() {
           <p className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-semibold mt-1">Manage operation time and load capacity</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Premium Date Selector */}
-          <div className="h-10 flex items-center gap-1.5 border border-slate-200 dark:border-slate-800 rounded-lg px-3 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 font-bold text-xs shadow-sm shrink-0">
-            <Calendar className="w-4 h-4 text-blue-600 stroke-[2.5] shrink-0" />
-            <input 
-              type="date" 
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent focus:outline-none cursor-pointer font-black text-slate-750 dark:text-slate-350 text-xs font-sans border-none p-0 outline-none w-[115px]"
-            />
-          </div>
-
           {/* Tab Switcher */}
           <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg overflow-x-auto max-w-full shrink-0 h-10 items-center">
             <button

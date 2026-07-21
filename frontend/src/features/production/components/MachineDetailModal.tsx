@@ -28,7 +28,10 @@ export function MachineDetailModal({ machine, tonnage, factory, onClose, onNavig
     ? urlTab 
     : 'pattern';
   
+  const { memberName, logoutOperator, activePortal } = useAuthStore();
+
   const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (activePortal === 'member') return getTodayDateString();
     if (initialDate) return initialDate;
     return getTodayDateString();
   });
@@ -46,8 +49,12 @@ export function MachineDetailModal({ machine, tonnage, factory, onClose, onNavig
 
   // Sync selectedDate when initialDate prop changes (e.g. parent date changes)
   useEffect(() => {
-    if (initialDate) setSelectedDate(initialDate);
-  }, [initialDate]);
+    if (activePortal === 'member') {
+      setSelectedDate(getTodayDateString());
+    } else if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate, activePortal]);
 
 
   // Auto initialize machine if empty in DB
@@ -66,7 +73,6 @@ export function MachineDetailModal({ machine, tonnage, factory, onClose, onNavig
   }, []);
 
   const systemLogo = useThemeStore((state) => state.systemLogo);
-  const { memberName, logoutOperator, activePortal } = useAuthStore();
 
   const handleExitMember = () => {
     logoutOperator();
@@ -103,13 +109,14 @@ export function MachineDetailModal({ machine, tonnage, factory, onClose, onNavig
                 <span className="h-7.5 sm:h-9 flex items-center px-2.5 sm:px-3 rounded-lg bg-slate-800 text-white font-mono font-black tracking-widest shadow-sm shrink-0 w-[80px] justify-center">
                   {currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
-                <div className="h-7.5 sm:h-9 flex items-center gap-1 sm:gap-1.5 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold text-[11px] sm:text-xs shadow-inner shrink-0">
+                <div className="h-7.5 sm:h-9 flex items-center gap-1 sm:gap-1.5 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 bg-slate-100 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 font-bold text-[11px] sm:text-xs shadow-inner shrink-0 opacity-80 cursor-not-allowed" title="Tanggal produksi member tidak dapat diubah">
                   <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#008d51] stroke-[2.5] shrink-0" />
                   <input 
                     type="date" 
                     value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent focus:outline-none cursor-pointer font-black text-slate-700 dark:text-slate-300 text-[11px] sm:text-xs font-sans border-none p-0 outline-none w-[95px] sm:w-[115px]"
+                    disabled
+                    readOnly
+                    className="bg-transparent focus:outline-none cursor-not-allowed font-black text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs font-sans border-none p-0 outline-none w-[95px] sm:w-[115px]"
                   />
                 </div>
               </div>

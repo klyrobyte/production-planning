@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  Trash2, 
-  Search, 
-  ChevronLeft, 
-  ChevronRight, 
-  Filter, 
+import {
+  Trash2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
   AlertTriangle,
   RefreshCcw
 } from 'lucide-react';
@@ -35,8 +35,8 @@ export default function GlobalLogsPage() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [meta, setMeta] = useState<MetaData>({ page: 1, limit: 25, total: 0, total_pages: 1 });
   const [page, setPage] = useState(1);
-  const [limit] = useState(25);
-  
+  const [limit, setLimit] = useState<number | string>(25);
+
   // Filter States
   const [searchUsername, setSearchUsername] = useState('');
   const [searchEndpoint, setSearchEndpoint] = useState('');
@@ -113,7 +113,8 @@ export default function GlobalLogsPage() {
             });
           }, 3000);
 
-          return [newLog, ...prev.slice(0, limit - 1)];
+          const maxItems = limit === 'all' ? Infinity : (parseInt(String(limit), 10) || 25);
+          return [newLog, ...(maxItems === Infinity ? prev : prev.slice(0, maxItems - 1))];
         });
 
         // Increment total logged request count
@@ -212,7 +213,7 @@ export default function GlobalLogsPage() {
           <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-white">Filter Pencarian</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <div className="space-y-1 text-left">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Username</label>
             <div className="relative">
@@ -271,6 +272,21 @@ export default function GlobalLogsPage() {
             />
           </div>
 
+          <div className="space-y-1 text-left">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white">Tampilkan Baris</label>
+            <select
+              value={limit}
+              onChange={(e) => { setLimit(e.target.value); setPage(1); }}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 cursor-pointer"
+            >
+              <option value="25" className="dark:bg-slate-900">25 Baris</option>
+              <option value="50" className="dark:bg-slate-900">50 Baris</option>
+              <option value="100" className="dark:bg-slate-900">100 Baris</option>
+              <option value="500" className="dark:bg-slate-900">500 Baris</option>
+              <option value="all" className="dark:bg-slate-900">Semua (Tanpa Limit)</option>
+            </select>
+          </div>
+
           <div className="flex items-end">
             <button
               onClick={handleResetFilters}
@@ -316,13 +332,12 @@ export default function GlobalLogsPage() {
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr 
-                    key={log.id} 
-                    className={`transition-all duration-500 ${
-                      newLogIds.has(log.id) 
-                        ? 'bg-emerald-50/65 dark:bg-emerald-950/20 border-l-4 border-l-emerald-500' 
+                  <tr
+                    key={log.id}
+                    className={`transition-all duration-500 ${newLogIds.has(log.id)
+                        ? 'bg-emerald-50/65 dark:bg-emerald-950/20 border-l-4 border-l-emerald-500'
                         : 'hover:bg-slate-50/50 dark:hover:bg-slate-850/20'
-                    }`}>
+                      }`}>
                     <td className="px-6 py-4 whitespace-nowrap text-slate-500 dark:text-white">
                       {format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}
                     </td>
@@ -370,7 +385,7 @@ export default function GlobalLogsPage() {
             <div className="text-xs font-bold text-slate-500 dark:text-white">
               Menampilkan {logs.length} dari <span className="font-extrabold text-slate-800 dark:text-white">{meta.total}</span> logs
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}

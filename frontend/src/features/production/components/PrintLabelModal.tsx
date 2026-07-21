@@ -451,12 +451,14 @@ export function PrintLabelModal({
                 <div className="text-[10px] uppercase font-bold text-[#E76114]/70 mb-1">Total Labels to Print</div>
                 <div className="text-2xl font-black">{totalLabels} <span className="text-xs font-bold text-[#E76114]/70">Labels</span></div>
               </div>
-              {isPrintLocked && (
+              {((isPrintLocked && lockMessage) || (targetTotal > 0 && actualQty >= targetTotal)) && (
                 <div className="bg-amber-50 dark:bg-amber-955/20 border border-amber-250 text-amber-800 dark:text-amber-455 p-3 rounded text-[10px] font-bold leading-snug flex items-start gap-1.5 shadow-sm mt-3">
                   <span>⚠️</span>
                   <div>
-                    {lockMessage}
-                    {activePortal !== 'member' && (
+                    {targetTotal > 0 && actualQty >= targetTotal
+                      ? `Target Lot Selesai: Produksi telah mencapai target (${actualQty}/${targetTotal} pcs). Pencetakan label Kanban dikunci.`
+                      : lockMessage}
+                    {activePortal !== 'member' && !(targetTotal > 0 && actualQty >= targetTotal) && (
                       <div className="mt-1.5 text-blue-700 font-extrabold uppercase text-[8px] tracking-wider bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 inline-block">
                         Leader Bypass Active
                       </div>
@@ -468,11 +470,11 @@ export function PrintLabelModal({
             <div className="pt-6">
               <button
                 onClick={handlePrint}
-                disabled={isPrinting || success || (isPrintLocked && activePortal === 'member')}
+                disabled={isPrinting || success || (targetTotal > 0 && actualQty >= targetTotal) || (isPrintLocked && activePortal === 'member')}
                 className={`w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer ${
                   success ? 'bg-emerald-500 text-white scale-95' :
                   isPrinting ? 'bg-orange-400 text-white cursor-wait scale-95' :
-                  (isPrintLocked && activePortal === 'member') ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none' : 'bg-[#E76114] text-white hover:opacity-95 hover:-translate-y-0.5'
+                  ((targetTotal > 0 && actualQty >= targetTotal) || (isPrintLocked && activePortal === 'member')) ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none' : 'bg-[#E76114] text-white hover:opacity-95 hover:-translate-y-0.5'
                 }`}
               >
                 {success ? (

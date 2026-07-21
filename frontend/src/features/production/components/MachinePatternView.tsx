@@ -161,9 +161,13 @@ interface ShiftTimelineProps {
   logs?: AbnormalityLog[];
   activeAbnormalStart?: string;
   activeNgStart?: string;
+  selectedDate?: string;
 }
 
-function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct = true, isAbnormalActive = false, isNgActive = false, logs = [], activeAbnormalStart = '', activeNgStart = '' }: ShiftTimelineProps) {
+function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct = true, isAbnormalActive = false, isNgActive = false, logs = [], activeAbnormalStart = '', activeNgStart = '', selectedDate }: ShiftTimelineProps) {
+  const todayDateStr = getTodayDateString();
+  const isToday = (selectedDate || todayDateStr) === todayDateStr;
+
   const allShiftJobs = jobs.filter(j => j.shift === shift);
   const allAvgShiftJobs = avgJobs.filter(j => j.shift === shift);
   const totalMins = shift === 'day' ? 720 : 615; // Day: 12h (07:00-19:00), Night: 10.25h (21:00-07:15)
@@ -240,8 +244,8 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
     return () => clearInterval(interval);
   }, []);
 
-  const currentOffset = getMinutesOffset(currentTimeStr);
-  const showCurrentTimeLine = currentOffset > 0 && currentOffset < totalMins;
+  const currentOffset = isToday ? getMinutesOffset(currentTimeStr) : -1;
+  const showCurrentTimeLine = isToday && currentOffset > 0 && currentOffset < totalMins;
 
   const dOT = dayOT || 'teiji';
   const nOT = nightOT || 'teiji';
@@ -276,7 +280,7 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
     let pStartStr = '';
     let pEndStr = '';
 
-    const currentClockTime = currentTimeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const currentClockTime = isToday ? (currentTimeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : undefined;
 
     const isSkipped = job.status === 'completed' && 
                       (job.actualQty === undefined || job.actualQty === 0) && 
@@ -472,14 +476,14 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
 
   });
 
-  if (isAbnormalActive && activeAbnormalStart && isTimeInShift(activeAbnormalStart)) {
+  if (isToday && isAbnormalActive && activeAbnormalStart && isTimeInShift(activeAbnormalStart)) {
     const key = `abnormal-${activeAbnormalStart}-ongoing`;
     if (!processedKeys.has(key) && !lossIntervals.some(e => e.kind === 'abnormal' && e.startTime === activeAbnormalStart)) {
       lossIntervals.push({ startTime: activeAbnormalStart, endTime: '', kind: 'abnormal' });
     }
   }
 
-  if (isNgActive && activeNgStart && isTimeInShift(activeNgStart)) {
+  if (isToday && isNgActive && activeNgStart && isTimeInShift(activeNgStart)) {
     const key = `ng-${activeNgStart}-ongoing`;
     if (!processedKeys.has(key) && !lossIntervals.some(e => e.kind === 'ng' && e.startTime === activeNgStart)) {
       lossIntervals.push({ startTime: activeNgStart, endTime: '', kind: 'ng' });
@@ -781,6 +785,33 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
                           }
                         }
 
+                        let finalDandoriElement = null;
+                        const fdStartStr = job.finalDandoriStart || (job.status === 'completed' && job.needsFinalDandori ? actTime.productionEndStr : undefined);
+                        if (fdStartStr) {
+                          const currentClockTime = currentTimeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                          const fdEndStr = job.finalDandoriEnd || (job.needsFinalDandori && !job.finalDandoriCompleted ? currentClockTime : fdStartStr);
+                          const fdStartOffset = getMinutesOffset(fdStartStr);
+                          let fdEndOffset = getMinutesOffset(fdEndStr);
+                          if (fdEndOffset <= fdStartOffset && job.needsFinalDandori && !job.finalDandoriCompleted) {
+                            fdEndOffset = Math.max(fdStartOffset + 2, getMinutesOffset(currentClockTime));
+                          }
+                          const fdLeftPercent = (fdStartOffset / totalMins) * 100;
+                          const fdWidthPercent = Math.max(0, ((fdEndOffset - fdStartOffset) / totalMins) * 100);
+
+                          if (fdWidthPercent > 0) {
+                            finalDandoriElement = (
+                              <div
+                                key={`act-final-dandori-${job.id}`}
+                                className="absolute top-0 bottom-0 bg-slate-950 border border-slate-700 flex items-center justify-center z-10 shadow-sm"
+                                style={{ left: `${fdLeftPercent}%`, width: `${fdWidthPercent}%` }}
+                                title={`Actual Final Setup / Cleanup (Dandori Akhir Shift ${job.shift?.toUpperCase()}): ${fdStartStr} - ${fdEndStr}`}
+                              >
+                                <span className="text-[7px] text-amber-400 font-black">D</span>
+                              </div>
+                            );
+                          }
+                        }
+
                         if (job.status === 'dandori') return null;
 
                         const startOffset = getMinutesOffset(actTime.productionStartStr);
@@ -789,7 +820,7 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
 
                         const leftPercent = (startOffset / totalMins) * 100;
                         const widthPercent = ((endOffset - startOffset) / totalMins) * 100;
-                        if (widthPercent <= 0) return dandoriElement;
+                        if (widthPercent <= 0) return <React.Fragment key={`act-group-${job.id}`}>{dandoriElement}{finalDandoriElement}</React.Fragment>;
 
                         const completedQty = job.actualQty || 0;
                         const progress = job.status === 'completed'
@@ -814,6 +845,7 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
                                 style={{ width: `${progress * 100}%`, backgroundColor: barColor, opacity: 0.85 }}
                               />
                             </div>
+                            {finalDandoriElement}
                           </React.Fragment>
                         );
                       })}
@@ -823,7 +855,7 @@ function ShiftTimeline({ shift, jobs, avgJobs, dayOT, nightOT, showDailyAndAct =
                         const startOff = getMinutesOffset(interval.startTime);
                         const endOff   = interval.endTime
                           ? getMinutesOffset(interval.endTime)
-                          : (currentTimeStr ? getMinutesOffset(currentTimeStr) : totalMins);
+                          : (isToday && currentTimeStr ? getMinutesOffset(currentTimeStr) : startOff);
                         const duration = Math.max(1, endOff - startOff);
                         if (duration <= 0) return null;
                         const leftPct  = (startOff / totalMins) * 100;
@@ -1489,8 +1521,8 @@ export function MachinePatternView({ machine, factory, machineKey: propsMachineK
 
          {/* Horizontal Timelines */}
          <div className="grid grid-cols-1 gap-6">
-           <ShiftTimeline shift="day" jobs={jobs} avgJobs={avgJobs} dayOT={dayOT} nightOT={nightOT} showDailyAndAct={showDailyAndAct} isAbnormalActive={isAbnormalActive} isNgActive={isNgActive} logs={logList} activeAbnormalStart={activeAbnormalStart} activeNgStart={activeNgStart} />
-           <ShiftTimeline shift="night" jobs={jobs} avgJobs={avgJobs} dayOT={dayOT} nightOT={nightOT} showDailyAndAct={showDailyAndAct} isAbnormalActive={isAbnormalActive} isNgActive={isNgActive} logs={logList} activeAbnormalStart={activeAbnormalStart} activeNgStart={activeNgStart} />
+           <ShiftTimeline shift="day" jobs={jobs} avgJobs={avgJobs} dayOT={dayOT} nightOT={nightOT} showDailyAndAct={showDailyAndAct} isAbnormalActive={isAbnormalActive} isNgActive={isNgActive} logs={logList} activeAbnormalStart={activeAbnormalStart} activeNgStart={activeNgStart} selectedDate={activeDate} />
+           <ShiftTimeline shift="night" jobs={jobs} avgJobs={avgJobs} dayOT={dayOT} nightOT={nightOT} showDailyAndAct={showDailyAndAct} isAbnormalActive={isAbnormalActive} isNgActive={isNgActive} logs={logList} activeAbnormalStart={activeAbnormalStart} activeNgStart={activeNgStart} selectedDate={activeDate} />
          </div>
 
          {!showDailyAndAct ? (
