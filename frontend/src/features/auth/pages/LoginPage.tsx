@@ -6,11 +6,14 @@ import AuthHeader from '../components/AuthHeader';
 import DeviceLoginForm from '../components/DeviceLoginForm';
 import MemberLoginForm from '../components/MemberLoginForm';
 
+import ToastNotification from '../../../shared/components/layout/ToastNotification';
+
 function LoginPageContent() {
   const { isAuthenticated, colorPrimary, logoutDevice } = useAuthContext();
 
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300 px-6 py-12 select-none overflow-y-auto">
+      <ToastNotification />
       {/* Decorative Brand Top Banner */}
       <div 
         style={{ backgroundColor: colorPrimary }}

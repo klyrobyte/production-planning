@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import OfflineBanner from './OfflineBanner';
+import ToastNotification from './ToastNotification';
 import { NAVIGATION_ITEMS } from '../../constants/navigation';
 
 // Wraps all protected views inside the responsive Sidebar/Navbar layout
@@ -17,6 +18,7 @@ export default function PageLayout() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
       <OfflineBanner />
+      <ToastNotification />
 
       {/* Dynamic sidebar */}
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
+import { useToastStore } from '../../../shared/store/useToastStore';
 import { userService } from './UserService';
 import type { UserItem, CreateUserPayload, UpdateUserPayload } from './UserTypes';
 
@@ -90,7 +91,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const triggerSuccessNotification = (msg: string) => {
     setSuccessMsg(msg);
+    useToastStore.getState().showToast(msg, 'success');
     setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  const triggerErrorNotification = (msg: string) => {
+    setErrorMsg(msg);
+    useToastStore.getState().showToast(msg, 'error');
   };
 
   const resetForm = () => {
@@ -152,7 +159,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       resetForm();
       loadUsers();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menambahkan user baru.');
+      triggerErrorNotification(err.response?.data?.message || 'Gagal menambahkan user baru.');
     } finally {
       setIsSubmitting(false);
     }
@@ -163,7 +170,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (!selectedUser) return;
     const validationError = userService.validateEditForm(nameInput);
     if (validationError) {
-      setErrorMsg(validationError);
+      triggerErrorNotification(validationError);
       return;
     }
 
@@ -184,7 +191,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       resetForm();
       loadUsers();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal memperbarui data user.');
+      triggerErrorNotification(err.response?.data?.message || 'Gagal memperbarui data user.');
     } finally {
       setIsSubmitting(false);
     }
@@ -201,7 +208,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setSelectedUser(null);
       loadUsers();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menghapus user.');
+      triggerErrorNotification(err.response?.data?.message || 'Gagal menghapus user.');
     } finally {
       setIsSubmitting(false);
     }

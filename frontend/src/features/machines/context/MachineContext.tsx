@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
+import { useToastStore } from '../../../shared/store/useToastStore';
 import { machineService } from './MachineService';
 import type { MachineItem, FactoryItem, DeleteTarget, CreateMachinePayload, UpdateMachinePayload } from './MachineTypes';
 
@@ -130,9 +131,10 @@ export function MachineProvider({ children }: { children: React.ReactNode }) {
   const triggerNotification = (msg: string, isError = false) => {
     if (isError) {
       setErrorMsg(msg);
-      setTimeout(() => setErrorMsg(null), 4000);
+      useToastStore.getState().showToast(msg, 'error');
     } else {
       setSuccessMsg(msg);
+      useToastStore.getState().showToast(msg, 'success');
       setTimeout(() => setSuccessMsg(null), 4000);
     }
   };

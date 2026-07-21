@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
+import { useToastStore } from '../../../shared/store/useToastStore';
 import { authService } from './AuthService';
 import type { FactoryData, MachineData } from './AuthTypes';
 
@@ -105,16 +106,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const validationMsg = authService.validateDeviceForm(deviceUsername);
     if (validationMsg) {
       setDeviceError(validationMsg);
+      useToastStore.getState().showToast(validationMsg, 'warning');
       return;
     }
 
     setIsDeviceLoading(true);
     try {
       await loginDeviceStore(deviceUsername, devicePassword);
+      useToastStore.getState().showToast('Otorisasi device berhasil.', 'success');
     } catch (err: any) {
       const responseData = err.response?.data;
       const message = responseData?.message || 'Gagal melakukan otorisasi device.';
       setDeviceError(message);
+      useToastStore.getState().showToast(message, 'error');
     } finally {
       setIsDeviceLoading(false);
     }
@@ -128,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const validationMsg = authService.validateMemberForm(selectedMachineId, memberName, pin);
     if (validationMsg) {
       setMemberError(validationMsg);
+      useToastStore.getState().showToast(validationMsg, 'warning');
       return;
     }
 
@@ -148,10 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         pin,
         memberName.trim()
       );
+      useToastStore.getState().showToast(`Selamat bekerja, ${memberName.trim()}!`, 'success');
     } catch (err: any) {
       const responseData = err.response?.data;
       const message = responseData?.message || 'PIN tidak valid atau terjadi kesalahan koneksi.';
       setMemberError(message);
+      useToastStore.getState().showToast(message, 'error');
     } finally {
       setIsMemberLoading(false);
     }
