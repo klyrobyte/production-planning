@@ -15,18 +15,16 @@ import {
   X,
   Trash2
 } from 'lucide-react';
-import api from '../../../shared/lib/axios';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
-
-interface OrderConversionsTabProps {
-  refreshTrigger: number;
-}
+import { useToastStore } from '../../../shared/store/useToastStore';
+import type { OrderConversionItem, OrderConversionsTabProps } from '../context/DatabaseTypes';
+import { databaseService } from '../context/DatabaseService';
 
 export default function OrderConversionsTab({ refreshTrigger }: OrderConversionsTabProps) {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
 
   // Order Conversions states
-  const [conversions, setConversions] = useState<any[]>([]);
+  const [conversions, setConversions] = useState<OrderConversionItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTermConversions, setSearchTermConversions] = useState('');
   const [categoryFilterConversions, setCategoryFilterConversions] = useState('ALL');
@@ -56,18 +54,13 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
     part_category: 'big'
   });
 
-  // Notification Feedbacks
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const fetchConversions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get('/order-conversions');
-      setConversions(res.data.data || []);
+      const data = await databaseService.fetchConversions();
+      setConversions(data);
     } catch (e) {
-      console.error('Failed to fetch order conversions:', e);
-      setErrorMsg('Gagal memuat mapping order conversions.');
+      useToastStore.getState().showToast('Gagal memuat mapping order conversions.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -124,14 +117,14 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        const parsed = parseConversionsCSVContent(text);
-        if (parsed.length === 0) {
+        const { parsedPreview, count } = databaseService.parseOrderConversionsCSV(text);
+        if (count === 0) {
           setCsvErrorConversions('Format CSV tidak valid atau data kosong.');
           setParsedPreviewConversions([]);
           setParsedCountConversions(0);
         } else {
-          setParsedPreviewConversions(parsed);
-          setParsedCountConversions(parsed.length);
+          setParsedPreviewConversions(parsedPreview);
+          setParsedCountConversions(count);
         }
       } catch (err) {
         console.error(err);
@@ -170,18 +163,14 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
   const handleSaveImportConversions = async () => {
     if (parsedPreviewConversions.length === 0) return;
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.post('/order-conversions/import', parsedPreviewConversions);
-      setSuccessMsg(`${parsedCountConversions} mapping order conversions berhasil di-import.`);
+      await databaseService.importConversionsBulk(parsedPreviewConversions);
+      useToastStore.getState().showToast(`${parsedCountConversions} mapping order conversions berhasil di-import.`, 'success');
       setParsedPreviewConversions([]);
       setParsedCountConversions(0);
       fetchConversions();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menyimpan data import mapping.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menyimpan data import mapping.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -190,21 +179,20 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
   const handleManualFormConversionsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { cust_part_number, cust_sebango, prod_sebango, part_category } = manualFormConversions;
-    if (!cust_part_number || !prod_sebango) {
-      setErrorMsg('Customer Part Number dan Production Sebango wajib diisi.');
+    const validationErr = databaseService.validateConversionForm(cust_part_number, prod_sebango);
+    if (validationErr) {
+      useToastStore.getState().showToast(validationErr, 'warning');
       return;
     }
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.post('/order-conversions', {
+      await databaseService.createConversion({
         cust_part_number: cust_part_number.trim(),
         cust_sebango: cust_sebango.trim() || 'CUST-SEB',
         prod_sebango: prod_sebango.trim(),
         part_category
       });
-      setSuccessMsg(`Mapping untuk ${cust_part_number} berhasil disimpan.`);
+      useToastStore.getState().showToast(`Mapping untuk ${cust_part_number} berhasil disimpan.`, 'success');
       setManualFormConversions({
         cust_part_number: '',
         cust_sebango: '',
@@ -212,10 +200,8 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
         part_category: 'big'
       });
       fetchConversions();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menyimpan mapping.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menyimpan mapping.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -233,42 +219,34 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
 
   const handleSaveEditConversion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedConversionForEdit) return;
+    if (!selectedConversionForEdit || !selectedConversionForEdit.id) return;
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.put(`/order-conversions/${selectedConversionForEdit.id}`, {
+      await databaseService.updateConversion(selectedConversionForEdit.id, {
         cust_part_number: editFormConversions.cust_part_number.trim(),
         cust_sebango: editFormConversions.cust_sebango.trim() || 'CUST-SEB',
         prod_sebango: editFormConversions.prod_sebango.trim(),
         part_category: editFormConversions.part_category
       });
-      setSuccessMsg('Mapping berhasil diperbarui.');
+      useToastStore.getState().showToast('Mapping berhasil diperbarui.', 'success');
       setSelectedConversionForEdit(null);
       fetchConversions();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal memperbarui mapping.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal memperbarui mapping.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteConversion = async (id: string) => {
+  const handleDeleteConversion = async (id: string | number) => {
     if (!confirm('Apakah Anda yakin ingin menghapus mapping ini?')) return;
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.delete(`/order-conversions/${id}`);
-      setSuccessMsg('Mapping berhasil dihapus.');
+      await databaseService.deleteConversion(id);
+      useToastStore.getState().showToast('Mapping berhasil dihapus.', 'success');
       fetchConversions();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menghapus mapping.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menghapus mapping.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -282,47 +260,18 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
     return { total, big, small };
   }, [conversions]);
 
-  // Conversions Filtering + Searching logic
+  // Conversions Filtering + Searching logic (Delegated to databaseService)
   const filteredConversions = useMemo(() => {
-    return conversions.filter(conv => {
-      const q = searchTermConversions.toLowerCase().trim();
-      const matchesSearch = 
-        (conv.cust_part_number || '').toLowerCase().includes(q) ||
-        (conv.cust_sebango || '').toLowerCase().includes(q) ||
-        (conv.prod_sebango || '').toLowerCase().includes(q);
-      
-      const matchesCategory = categoryFilterConversions === 'ALL' || conv.part_category === categoryFilterConversions;
-      
-      return matchesSearch && matchesCategory;
-    });
+    return databaseService.filterOrderConversions(conversions, searchTermConversions, categoryFilterConversions);
   }, [conversions, searchTermConversions, categoryFilterConversions]);
 
-  // Conversions Pagination logic
-  const totalPagesConversions = Math.ceil(filteredConversions.length / itemsPerPageConversions) || 1;
-  const paginatedConversions = useMemo(() => {
-    const startIndex = (currentPageConversions - 1) * itemsPerPageConversions;
-    return filteredConversions.slice(startIndex, startIndex + itemsPerPageConversions);
-  }, [filteredConversions, currentPageConversions]);
+  // Conversions Pagination logic (Delegated to databaseService)
+  const { paginatedItems: paginatedConversions, totalPages: totalPagesConversions } = useMemo(() => {
+    return databaseService.paginateItems(filteredConversions, currentPageConversions, itemsPerPageConversions);
+  }, [filteredConversions, currentPageConversions, itemsPerPageConversions]);
 
   return (
     <div className="space-y-6">
-      {/* Success / Error Notification */}
-      {successMsg && (
-        <div className="rounded-xl border border-emerald-100 dark:border-emerald-950/30 bg-emerald-50 dark:bg-emerald-950/20 p-4 text-xs font-bold text-emerald-700 dark:text-emerald-450 flex items-center justify-between animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="rounded-xl border border-rose-100 dark:border-rose-950/30 bg-rose-50 dark:bg-rose-950/20 p-4 text-xs font-bold text-rose-700 dark:text-rose-455 flex items-center gap-2 animate-in fade-in duration-200">
-          <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all duration-300">
@@ -663,7 +612,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteConversion(row.id)}
+                              onClick={() => row.id && handleDeleteConversion(row.id)}
                               className="rounded-lg p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
                               title="Hapus Mapping"
                             >

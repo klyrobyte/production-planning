@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Plus, 
   Search, 
-  CheckCircle, 
-  AlertTriangle, 
   ChevronLeft, 
   ChevronRight, 
   RefreshCw, 
@@ -13,18 +11,10 @@ import {
   Trash2, 
   UserCheck 
 } from 'lucide-react';
-import api from '../../../shared/lib/axios';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
-
-interface LeaderItem {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-interface LeadersTabProps {
-  refreshTrigger: number;
-}
+import { useToastStore } from '../../../shared/store/useToastStore';
+import type { LeaderItem, LeadersTabProps } from '../context/DatabaseTypes';
+import { databaseService } from '../context/DatabaseService';
 
 export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
@@ -43,21 +33,16 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
   });
 
   // Reveal PIN states
-  const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
-  const [revealingId, setRevealingId] = useState<string | null>(null);
-
-  // Feedback Notifications
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [revealedPins, setRevealedPins] = useState<Record<string | number, string>>({});
+  const [revealingId, setRevealingId] = useState<string | number | null>(null);
 
   const fetchLeaders = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get('/leaders');
-      setLeaders(res.data.data || []);
+      const data = await databaseService.fetchLeaders();
+      setLeaders(data);
     } catch (e) {
-      console.error('Failed to fetch leaders:', e);
-      setErrorMsg('Gagal memuat data leaders.');
+      useToastStore.getState().showToast('Gagal memuat data leaders.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -71,39 +56,30 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
     e.preventDefault();
     const { name, pin } = manualForm;
     
-    if (!name.trim()) {
-      setErrorMsg('Nama leader wajib diisi.');
-      return;
-    }
-    if (!pin || pin.length !== 4 || isNaN(Number(pin))) {
-      setErrorMsg('PIN harus terdiri dari 4 digit angka.');
+    const validationError = databaseService.validateLeaderForm(name, pin);
+    if (validationError) {
+      useToastStore.getState().showToast(validationError, 'warning');
       return;
     }
 
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    
     try {
-      await api.post('/leaders', {
+      await databaseService.createLeader({
         name: name.trim(),
         pin: String(pin)
       });
-      setSuccessMsg(`Leader ${name} berhasil ditambahkan.`);
+      useToastStore.getState().showToast(`Leader ${name} berhasil ditambahkan.`, 'success');
       setManualForm({ name: '', pin: '' });
       fetchLeaders();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menambahkan leader.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menambahkan leader.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleToggleRevealPin = async (id: string) => {
+  const handleToggleRevealPin = async (id: string | number) => {
     if (revealedPins[id]) {
-      // Hide if already revealed
       setRevealedPins(prev => {
         const copy = { ...prev };
         delete copy[id];
@@ -114,27 +90,22 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
 
     setRevealingId(id);
     try {
-      const res = await api.get(`/leaders/${id}/reveal-pin`);
-      const pin = res.data.data?.pin || 'N/A';
+      const pin = await databaseService.revealLeaderPin(id);
       setRevealedPins(prev => ({ ...prev, [id]: pin }));
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal mengungkapkan PIN leader.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal mengungkapkan PIN leader.', 'error');
     } finally {
       setRevealingId(null);
     }
   };
 
-  const handleDeleteLeader = async (id: string, name: string) => {
+  const handleDeleteLeader = async (id: string | number, name: string) => {
     if (!confirm(`Apakah Anda yakin ingin menghapus leader "${name}"?`)) return;
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.delete(`/leaders/${id}`);
-      setSuccessMsg(`Leader "${name}" berhasil dihapus.`);
+      await databaseService.deleteLeader(id);
+      useToastStore.getState().showToast(`Leader "${name}" berhasil dihapus.`, 'success');
       
-      // Cleanup revealed PIN for this id
       setRevealedPins(prev => {
         const copy = { ...prev };
         delete copy[id];
@@ -142,49 +113,24 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
       });
       
       fetchLeaders();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menghapus leader.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menghapus leader.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Filtering & Searching logic
+  // Delegated filtering & pagination computation to databaseService
   const filteredLeaders = useMemo(() => {
-    return leaders.filter(leader => {
-      const q = searchTerm.toLowerCase().trim();
-      return (leader.name || '').toLowerCase().includes(q);
-    });
+    return databaseService.filterItems(leaders, 'name', searchTerm);
   }, [leaders, searchTerm]);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredLeaders.length / itemsPerPage) || 1;
-  const paginatedLeaders = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredLeaders.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredLeaders, currentPage]);
+  const { paginatedItems: paginatedLeaders, totalPages } = useMemo(() => {
+    return databaseService.paginateItems(filteredLeaders, currentPage, itemsPerPage);
+  }, [filteredLeaders, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-6">
-      {/* Success / Error Notification */}
-      {successMsg && (
-        <div className="rounded-xl border border-emerald-100 dark:border-emerald-950/30 bg-emerald-50 dark:bg-emerald-950/20 p-4 text-xs font-bold text-emerald-700 dark:text-emerald-450 flex items-center justify-between animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="rounded-xl border border-rose-100 dark:border-rose-955/30 bg-rose-50 dark:bg-rose-950/20 p-4 text-xs font-bold text-rose-700 dark:text-rose-455 flex items-center gap-2 animate-in fade-in duration-200">
-          <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all duration-300">
@@ -335,11 +281,13 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                           )}
                         </td>
                         <td className="px-6 py-4 text-left font-mono text-[10px] text-slate-400 dark:text-slate-500">
-                          {new Date(row.created_at).toLocaleString('id-ID', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {row.created_at
+                            ? new Date(row.created_at).toLocaleString('id-ID', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : '-'}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">

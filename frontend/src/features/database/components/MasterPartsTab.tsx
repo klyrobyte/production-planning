@@ -17,45 +17,10 @@ import {
   FileText,
   Trash2
 } from 'lucide-react';
-import api from '../../../shared/lib/axios';
 import { useThemeStore } from '../../../shared/store/useThemeStore';
-
-interface PartItem {
-  id?: string;
-  part_number: string;
-  part_name: string;
-  home_line?: string;
-  backup_line?: string;
-  model?: string;
-  cycle_time?: number;
-  sebango?: string;
-  material?: string;
-  area?: string;
-  tonnage?: string;
-  cavity?: number;
-  mold?: string;
-  weight?: number;
-  spec?: number;
-  process?: string;
-  shikake?: number;
-  customer?: string;
-  customer_pno?: string;
-  customer_sebango?: string;
-  created_at?: string;
-  daily_requirement_n?: number;
-  daily_requirement_n1?: number;
-  daily_requirement_n2?: number;
-  daily_requirement_n3?: number;
-  month_n_forecast?: number;
-  month_n1_forecast?: number;
-  month_n2_forecast?: number;
-  month_n3_forecast?: number;
-  monthly_forecasts?: Record<string, number>;
-}
-
-interface MasterPartsTabProps {
-  refreshTrigger: number;
-}
+import { useToastStore } from '../../../shared/store/useToastStore';
+import type { PartItem, MasterPartsTabProps } from '../context/DatabaseTypes';
+import { databaseService } from '../context/DatabaseService';
 
 export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
@@ -125,17 +90,13 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     spec: '6'
   });
 
-  // Notification Feedbacks
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   // Machines state
   const [machines, setMachines] = useState<any[]>([]);
 
   const fetchMachines = useCallback(async () => {
     try {
-      const res = await api.get('/machines');
-      setMachines(res.data.data || []);
+      const data = await databaseService.fetchMachines();
+      setMachines(data);
     } catch (e) {
       console.error('Failed to fetch machines:', e);
     }
@@ -144,11 +105,10 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
   const fetchParts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get('/parts');
-      setParts(res.data.data || []);
+      const data = await databaseService.fetchParts();
+      setParts(data);
     } catch (e) {
-      console.error('Failed to fetch parts:', e);
-      setErrorMsg('Gagal memuat master parts database.');
+      useToastStore.getState().showToast('Gagal memuat master parts database.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -306,17 +266,16 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const parsed = parseCSVContent(text);
+        const { parsedParts, count } = databaseService.parseMasterPartsCSV(text, machines);
         
-        if (parsed.length === 0) {
+        if (count === 0) {
           setCsvError('Tidak ada part valid yang ditemukan. Pastikan kolom header sesuai format.');
           setParsedPreview([]);
           setParsedCount(0);
         } else {
-          setParsedPreview(parsed);
-          setParsedCount(parsed.length);
-          setSuccessMsg(`Berhasil menganalisis ${parsed.length} part dari CSV.`);
-          setTimeout(() => setSuccessMsg(null), 3000);
+          setParsedPreview(parsedParts);
+          setParsedCount(count);
+          useToastStore.getState().showToast(`Berhasil menganalisis ${count} part dari CSV.`, 'info');
         }
       } catch (err: any) {
         setCsvError(err.message || 'Error parsing file CSV.');
@@ -363,16 +322,14 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     if (parsedPreview.length === 0) return;
     setIsLoading(true);
     try {
-      await api.post('/parts/import', parsedPreview);
-      setSuccessMsg(`Berhasil mengunggah ${parsedPreview.length} part baru ke database.`);
+      await databaseService.importPartsBulk(parsedPreview);
+      useToastStore.getState().showToast(`Berhasil mengunggah ${parsedPreview.length} part baru ke database.`, 'success');
       setParsedPreview([]);
       setParsedCount(0);
       fetchParts();
-      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (e: any) {
       console.error(e);
-      setErrorMsg(e.response?.data?.message || 'Gagal mengimpor part dari CSV.');
-      setTimeout(() => setErrorMsg(null), 4000);
+      useToastStore.getState().showToast(e.response?.data?.message || 'Gagal mengimpor part dari CSV.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -395,8 +352,6 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
 
   const handleAddManualPart = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
 
     const {
       area,
@@ -420,7 +375,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     } = manualForm;
 
     if (!part_number || !part_name || !model || !customer || !sebango) {
-      setErrorMsg('Semua kolom identitas bertanda bintang (*) wajib diisi.');
+      useToastStore.getState().showToast('Semua kolom identitas bertanda bintang (*) wajib diisi.', 'warning');
       return;
     }
 
@@ -448,8 +403,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
 
     setIsLoading(true);
     try {
-      await api.post('/parts', payload);
-      setSuccessMsg(`Part ${part_number} berhasil disimpan.`);
+      await databaseService.createPart(payload);
+      useToastStore.getState().showToast(`Part ${part_number} berhasil disimpan.`, 'success');
       setManualForm({
         area: '',
         tonnage: '',
@@ -471,10 +426,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
         spec: '6'
       });
       fetchParts();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menyimpan master part.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menyimpan master part.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -522,8 +475,6 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
   const handleSaveRevision = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPartForEdit) return;
-    setErrorMsg(null);
-    setSuccessMsg(null);
 
     const {
       area,
@@ -547,7 +498,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     } = editForm;
 
     if (!part_number || !part_name || !model || !customer || !sebango) {
-      setErrorMsg('Semua kolom identitas bertanda bintang (*) wajib diisi.');
+      useToastStore.getState().showToast('Semua kolom identitas bertanda bintang (*) wajib diisi.', 'warning');
       return;
     }
 
@@ -576,14 +527,12 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
 
     setIsLoading(true);
     try {
-      await api.post('/parts', payload); // Upsert endpoint
-      setSuccessMsg(`Revisi part ${part_number} berhasil disimpan.`);
+      await databaseService.createPart(payload);
+      useToastStore.getState().showToast(`Revisi part ${part_number} berhasil disimpan.`, 'success');
       setSelectedPartForEdit(null);
       fetchParts();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Gagal menyimpan perubahan part.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menyimpan perubahan part.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -592,17 +541,13 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
   const handleDeletePart = async (partNumber: string) => {
     if (!confirm(`Apakah Anda yakin ingin menghapus part "${partNumber}" dari database? Tindakan ini tidak dapat dibatalkan.`)) return;
     setIsLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
-      await api.delete(`/parts/${partNumber}`);
-      setSuccessMsg(`Part "${partNumber}" berhasil dihapus.`);
+      await databaseService.deletePart(partNumber);
+      useToastStore.getState().showToast(`Part "${partNumber}" berhasil dihapus.`, 'success');
       fetchParts();
-      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
       console.error('Failed to delete part:', err);
-      setErrorMsg(err.response?.data?.message || 'Gagal menghapus part.');
-      setTimeout(() => setErrorMsg(null), 3000);
+      useToastStore.getState().showToast(err.response?.data?.message || 'Gagal menghapus part.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -630,48 +575,20 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     return models.sort();
   }, [parts]);
 
-  // Filtering + Searching logic
+  // Filtering + Searching logic (Delegated to databaseService)
   const filteredParts = useMemo(() => {
-    return parts.filter(part => {
-      const matchesSearch = 
-        (part.part_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (part.part_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (part.model || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (part.sebango || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesLine = lineFilter === 'ALL' || part.home_line === lineFilter;
-      const matchesModel = modelFilter === 'ALL' || part.model === modelFilter;
-      
-      return matchesSearch && matchesLine && matchesModel;
+    return databaseService.filterMasterParts(parts, searchTerm, 'ALL', lineFilter).filter(part => {
+      return modelFilter === 'ALL' || part.model === modelFilter;
     });
   }, [parts, searchTerm, lineFilter, modelFilter]);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredParts.length / itemsPerPage) || 1;
-  const paginatedParts = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredParts.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredParts, currentPage]);
+  // Pagination logic (Delegated to databaseService)
+  const { paginatedItems: paginatedParts, totalPages } = useMemo(() => {
+    return databaseService.paginateItems(filteredParts, currentPage, itemsPerPage);
+  }, [filteredParts, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-6">
-      {/* Success / Error Notification */}
-      {successMsg && (
-        <div className="rounded-xl border border-emerald-100 dark:border-emerald-950/30 bg-emerald-50 dark:bg-emerald-950/20 p-4 text-xs font-bold text-emerald-700 dark:text-emerald-450 flex items-center justify-between animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="rounded-xl border border-rose-100 dark:border-rose-950/30 bg-rose-50 dark:bg-rose-950/20 p-4 text-xs font-bold text-rose-700 dark:text-rose-450 flex items-center gap-2 animate-in fade-in duration-200">
-          <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all duration-300">
