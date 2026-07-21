@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { PackageSearch, ArrowRight, ShieldCheck, Plus, X, Calendar, CheckCircle } from 'lucide-react';
-import { useAuthStore } from '../../../shared/store/useAuthStore';
-import { useProduction, getUniqueMachineKey, machinesMatch } from '../context/ProductionContext';
-import type { Job } from '../context/ProductionContext';
-import api from '../../../shared/lib/axios';
+import { useAuthStore } from '../../../../shared/store/useAuthStore';
+import { useProduction, getUniqueMachineKey, machinesMatch } from '../../context/ProductionContext';
+import type { Job } from '../../context/ProductionContext';
+import api from '../../../../shared/lib/axios';
 
 interface MachinePartListViewProps {
   machine: string;
@@ -14,14 +14,11 @@ interface MachinePartListViewProps {
 
 // Displays registered parts and schedules them for production queue
 export function MachinePartListView({ machine, factory, machineKey: propsMachineKey, selectedDate }: MachinePartListViewProps) {
-  const activePortal = useAuthStore(state => state.activePortal);
+  const activePortal = useAuthStore((state) => state.activePortal);
   const canEditPattern = activePortal === 'super-admin' || activePortal === 'planner' || activePortal === 'leader';
   const machineKey = propsMachineKey || getUniqueMachineKey(factory, machine);
 
-  const {
-    machineJobs,
-    reorderMachineJobs
-  } = useProduction();
+  const { machineJobs, reorderMachineJobs } = useProduction();
 
   const activeDate = selectedDate || new Date().toISOString().slice(0, 10);
   const planKey = `${activeDate}_${machineKey}`;
@@ -114,14 +111,14 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
   const targetMachineCode = `${formattedFactory}-${machine}`;
 
   const homeLineParts = useMemo(() => {
-    return partListDb.filter(p => {
+    return partListDb.filter((p) => {
       const hl = (p.home_line || p.homeLine || '').trim();
       return hl && machinesMatch(hl, targetMachineCode);
     });
   }, [partListDb, targetMachineCode]);
 
   const backupLineParts = useMemo(() => {
-    return partListDb.filter(p => {
+    return partListDb.filter((p) => {
       const bl = (p.backup_line || p.backupLine || '').trim();
       const hl = (p.home_line || p.homeLine || '').trim();
       return bl && machinesMatch(bl, targetMachineCode) && (!hl || !machinesMatch(hl, targetMachineCode));
@@ -145,7 +142,9 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                 <Calendar className="w-4.5 h-4.5" />
                 <div>
                   <h3 className="font-bold text-xs tracking-wide">Schedule Production Job</h3>
-                  <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider mt-0.5 font-mono">{schedulingPart.part_number || schedulingPart.sebango}</p>
+                  <p className="text-[9px] text-white/80 font-bold uppercase tracking-wider mt-0.5 font-mono">
+                    {schedulingPart.part_number || schedulingPart.sebango}
+                  </p>
                 </div>
               </div>
               <button
@@ -158,13 +157,25 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
 
             <form onSubmit={handleAddPartToSequence} className="p-5 space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200/50 dark:border-slate-750 text-xs space-y-1.5 font-medium text-slate-700 dark:text-slate-300">
-                <div>Part Name: <b className="text-slate-900 dark:text-white">{schedulingPart.part_name || schedulingPart.partName}</b></div>
-                <div>Model / Customer: <b className="text-slate-900 dark:text-white">{schedulingPart.model} / {schedulingPart.customer}</b></div>
-                <div>Cavity: <b className="text-slate-900 dark:text-white">{schedulingPart.cavity}</b> | Cycle Time: <b className="text-slate-900 dark:text-white">{schedulingPart.cycle_time || schedulingPart.cycleTime}s</b></div>
+                <div>
+                  Part Name: <b className="text-slate-900 dark:text-white">{schedulingPart.part_name || schedulingPart.partName}</b>
+                </div>
+                <div>
+                  Model / Customer:{' '}
+                  <b className="text-slate-900 dark:text-white">
+                    {schedulingPart.model} / {schedulingPart.customer}
+                  </b>
+                </div>
+                <div>
+                  Cavity: <b className="text-slate-900 dark:text-white">{schedulingPart.cavity}</b> | Cycle Time:{' '}
+                  <b className="text-slate-900 dark:text-white">{schedulingPart.cycle_time || schedulingPart.cycleTime}s</b>
+                </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Target Production Qty (Lot Target) *</label>
+                <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">
+                  Target Production Qty (Lot Target) *
+                </label>
                 <input
                   type="number"
                   required
@@ -176,7 +187,9 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Dandori Setup Time (Minutes)</label>
+                <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">
+                  Dandori Setup Time (Minutes)
+                </label>
                 <input
                   type="number"
                   required
@@ -233,12 +246,26 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Sebango / Part No</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Part Name</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Model / Customer</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Material</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Cycle Time</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Dandori</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Shikake</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Backup Machine</th>
-                    {canEditPattern && <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">Actions</th>}
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                      Material
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                      Cycle Time
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                      Dandori
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                      Shikake
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                      Backup Machine
+                    </th>
+                    {canEditPattern && (
+                      <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -246,27 +273,47 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     homeLineParts.map((part, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors group">
                         <td className="px-4 py-3">
-                          <div className="font-mono font-bold text-slate-800 dark:text-white text-[13px]">{part.sebango}</div>
-                          <div className="text-[11px] text-slate-500 max-w-[160px] truncate" title={part.part_number || part.partNumber}>{part.part_number || part.partNumber || '-'}</div>
+                          <div className="font-mono font-bold text-slate-800 dark:text-white text-[13px]">
+                            {part.sebango}
+                          </div>
+                          <div
+                            className="text-[11px] text-slate-500 max-w-[160px] truncate"
+                            title={part.part_number || part.partNumber}
+                          >
+                            {part.part_number || part.partNumber || '-'}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-700 dark:text-slate-300">{part.part_name || part.partName}</div>
+                          <div className="font-medium text-slate-700 dark:text-slate-300">
+                            {part.part_name || part.partName}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-block px-2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-2">{part.model}</span>
+                          <span className="inline-block px-2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-2">
+                            {part.model}
+                          </span>
                           <span className="text-slate-500 text-xs">{part.customer}</span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400 max-w-[200px] truncate border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20" title={part.material}>
+                        <td
+                          className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400 max-w-[200px] truncate border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20"
+                          title={part.material}
+                        >
                           {part.material || '-'}
                         </td>
                         <td className="px-4 py-3 text-center border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.cycle_time || part.cycleTime)}s</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.cycle_time || part.cycleTime}s
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.dandori || 15)}m</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.dandori || 15}m
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.shikake || 2)}x</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.shikake || 2}x
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20">
                           {part.backup_line || part.backupLine ? (
@@ -292,7 +339,10 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={canEditPattern ? 9 : 8} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-950/20">
+                      <td
+                        colSpan={canEditPattern ? 9 : 8}
+                        className="px-4 py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-950/20"
+                      >
                         Belum ada part home yang terdaftar untuk mesin ini.
                       </td>
                     </tr>
@@ -325,11 +375,23 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Sebango / Part No</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Part Name</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Model / Customer</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">Cycle Time</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">Dandori</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">Shikake</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">Home Machine</th>
-                    {canEditPattern && <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">Actions</th>}
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">
+                      Cycle Time
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">
+                      Dandori
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">
+                      Shikake
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">
+                      Home Machine
+                    </th>
+                    {canEditPattern && (
+                      <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -337,24 +399,41 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     backupLineParts.map((part, idx) => (
                       <tr key={idx} className="hover:bg-amber-50/30 dark:hover:bg-slate-900 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="font-mono font-bold text-slate-800 dark:text-white text-[13px]">{part.sebango}</div>
-                          <div className="text-[11px] text-slate-500 max-w-[160px] truncate" title={part.part_number || part.partNumber}>{part.part_number || part.partNumber || '-'}</div>
+                          <div className="font-mono font-bold text-slate-800 dark:text-white text-[13px]">
+                            {part.sebango}
+                          </div>
+                          <div
+                            className="text-[11px] text-slate-500 max-w-[160px] truncate"
+                            title={part.part_number || part.partNumber}
+                          >
+                            {part.part_number || part.partNumber || '-'}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-700 dark:text-slate-300">{part.part_name || part.partName}</div>
+                          <div className="font-medium text-slate-700 dark:text-slate-300">
+                            {part.part_name || part.partName}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-block px-2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-2">{part.model}</span>
+                          <span className="inline-block px-2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-2">
+                            {part.model}
+                          </span>
                           <span className="text-slate-500 text-xs">{part.customer}</span>
                         </td>
                         <td className="px-4 py-3 text-center border-l bg-slate-50/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-800">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.cycle_time || part.cycleTime)}s</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.cycle_time || part.cycleTime}s
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l bg-slate-50/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-800">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.dandori || 15)}m</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.dandori || 15}m
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l bg-slate-50/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-800">
-                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">{(part.shikake || 2)}x</div>
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {part.shikake || 2}x
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-center border-l bg-slate-50/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-800">
                           <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
@@ -376,7 +455,10 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={canEditPattern ? 8 : 7} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-950/20">
+                      <td
+                        colSpan={canEditPattern ? 8 : 7}
+                        className="px-4 py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-950/20"
+                      >
                         Belum ada part cadangan yang terdaftar untuk mesin ini.
                       </td>
                     </tr>

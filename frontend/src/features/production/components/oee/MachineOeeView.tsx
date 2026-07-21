@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Award, Clock, Activity, Zap, CheckCircle2, RefreshCw, Printer, ShieldAlert, Cpu } from 'lucide-react';
-import { useProduction, getUniqueMachineKey } from '../context/ProductionContext';
+import { useProduction, getUniqueMachineKey } from '../../context/ProductionContext';
 
 interface MachineOeeViewProps {
   machine: string;
@@ -15,10 +15,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
   const activeDate = selectedDate || new Date().toISOString().slice(0, 10);
   const planKey = `${activeDate}_${machineKey}`;
 
-  const {
-    machineJobs,
-    logs
-  } = useProduction();
+  const { machineJobs, logs } = useProduction();
 
   const jobs = machineJobs[planKey] || [];
   const logList = logs[planKey] || [];
@@ -28,9 +25,11 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
   const [batteryLevel] = useState(90);
   const [isJamSimulated, setIsJamSimulated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [printQueue, setPrintQueue] = useState<{ id: string; time: string; label: string; status: 'printed' | 'pending-retry' | 'failed' }[]>([
+  const [printQueue, setPrintQueue] = useState<
+    { id: string; time: string; label: string; status: 'printed' | 'pending-retry' | 'failed' }[]
+  >([
     { id: '1', time: '14:22', label: 'Box #021 - Part 62511-0K560-C0', status: 'printed' },
-    { id: '2', time: '15:05', label: 'Box #022 - Part 62511-0K560-C0', status: 'printed' }
+    { id: '2', time: '15:05', label: 'Box #022 - Part 62511-0K560-C0', status: 'printed' },
   ]);
 
   const metrics = React.useMemo(() => {
@@ -44,10 +43,10 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
     const performance = totalTargetQty > 0 ? Math.min(100, (totalActualQty / totalTargetQty) * 100) : 100;
     let totalOk = 0;
     let totalNg = 0;
-    jobs.forEach(job => {
+    jobs.forEach((job) => {
       if (job.status === 'completed') {
         const completionLog = logList.find(
-          log => log.message.includes('OK:') && log.message.includes('NG:')
+          (log) => log.message.includes('OK:') && log.message.includes('NG:')
         );
         if (completionLog) {
           const okMatch = completionLog.message.match(/OK:\s*(\d+)/);
@@ -76,7 +75,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       availability,
       performance,
       quality,
-      oee
+      oee,
     };
   }, [jobs, logList, machine]);
 
@@ -90,7 +89,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       const dd = String(d.getDate()).padStart(2, '0');
       dates.push(`${yyyy}-${mm}-${dd}`);
     }
-    return dates.map(date => {
+    return dates.map((date) => {
       const key = `${date}_${machineKey}`;
       const dayJobs = machineJobs[key] || [];
       const dayLogs = logs[key] || [];
@@ -109,10 +108,10 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       }
       let totalOk = 0;
       let totalNg = 0;
-      dayJobs.forEach(job => {
+      dayJobs.forEach((job) => {
         if (job.status === 'completed') {
           const completionLog = dayLogs.find(
-            log => log.message.includes('OK:') && log.message.includes('NG:')
+            (log) => log.message.includes('OK:') && log.message.includes('NG:')
           );
           if (completionLog) {
             const okMatch = completionLog.message.match(/OK:\s*(\d+)/);
@@ -133,7 +132,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       const oee = (availability * performance * quality) / 10000;
       return {
         date: date.substring(5),
-        oee: dayJobs.length > 0 ? oee : 100
+        oee: dayJobs.length > 0 ? oee : 100,
       };
     });
   }, [machineJobs, logs, machineKey]);
@@ -172,15 +171,20 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
   const handleSimulateJam = () => {
     setIsJamSimulated(true);
     setPrinterConnected(false);
-    setPrintQueue(prev => [
-      { id: Date.now().toString(), time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), label: 'Box #023 - Part 62511-0K560-C0', status: 'pending-retry' },
-      ...prev
+    setPrintQueue((prev) => [
+      {
+        id: Date.now().toString(),
+        time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        label: 'Box #023 - Part 62511-0K560-C0',
+        status: 'pending-retry',
+      },
+      ...prev,
     ]);
   };
 
   // Wipes failed label items from local buffer queue
   const handleClearQueue = () => {
-    setPrintQueue(prev => prev.filter(q => q.status === 'printed'));
+    setPrintQueue((prev) => prev.filter((q) => q.status === 'printed'));
   };
 
   // Triggers basic verification check print alert popup
@@ -189,7 +193,11 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       alert('Cannot print: Printer is offline or paper is jammed.');
       return;
     }
-    alert(`DIAGNOSTIC TEST PRINT\n-------------------------\nMachine: ${machine}\nFactory: ${factory}\nOEE Level: ${metrics.oee.toFixed(1)}%\nPaper: ${paperLevel}%\nBattery: ${batteryLevel}%\n-------------------------`);
+    alert(
+      `DIAGNOSTIC TEST PRINT\n-------------------------\nMachine: ${machine}\nFactory: ${factory}\nOEE Level: ${metrics.oee.toFixed(
+        1
+      )}%\nPaper: ${paperLevel}%\nBattery: ${batteryLevel}%\n-------------------------`
+    );
   };
 
   return (
@@ -202,9 +210,19 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
           </h3>
           <div className="relative flex items-center justify-center my-2">
             <svg className="w-36 h-36">
-              <circle className="text-slate-105 dark:text-slate-800" strokeWidth="12" stroke="currentColor" fill="transparent" r="58" cx="72" cy="72"/>
               <circle
-                className={`${metrics.oee >= 85 ? 'text-emerald-500' : metrics.oee >= 70 ? 'text-amber-500' : 'text-rose-500'} transition-all duration-1000 ease-out`}
+                className="text-slate-105 dark:text-slate-800"
+                strokeWidth="12"
+                stroke="currentColor"
+                fill="transparent"
+                r="58"
+                cx="72"
+                cy="72"
+              />
+              <circle
+                className={`${
+                  metrics.oee >= 85 ? 'text-emerald-500' : metrics.oee >= 70 ? 'text-amber-500' : 'text-rose-500'
+                } transition-all duration-1000 ease-out`}
                 strokeWidth="12"
                 strokeDasharray={364}
                 strokeDashoffset={364 - (364 * Math.max(5, metrics.oee)) / 100}
@@ -218,15 +236,24 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
               />
             </svg>
             <div className="absolute text-center">
-              <span className="text-3xl font-black text-slate-800 dark:text-white leading-none">{metrics.oee.toFixed(1)}%</span>
+              <span className="text-3xl font-black text-slate-800 dark:text-white leading-none">
+                {metrics.oee.toFixed(1)}%
+              </span>
               <span className="block text-[8px] font-extrabold uppercase tracking-wider text-slate-400 mt-1">
                 {metrics.oee >= 85 ? 'World Class 🟢' : metrics.oee >= 70 ? 'Target OK 🟡' : 'Below Target 🔴'}
               </span>
             </div>
           </div>
           <div className="w-full grid grid-cols-2 gap-2 mt-6 text-[10px] font-bold text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-4">
-            <div>Target OEE: <span className="text-slate-800 dark:text-white font-extrabold">85.0%</span></div>
-            <div className="text-right">Scanned Output: <span className="text-slate-800 dark:text-white font-extrabold">{metrics.actualQty} / {metrics.targetQty}</span></div>
+            <div>
+              Target OEE: <span className="text-slate-800 dark:text-white font-extrabold">85.0%</span>
+            </div>
+            <div className="text-right">
+              Scanned Output:{' '}
+              <span className="text-slate-800 dark:text-white font-extrabold">
+                {metrics.actualQty} / {metrics.targetQty}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -240,14 +267,18 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                 <span className="font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-blue-500" /> Availability (Ketersediaan Mesin)
                 </span>
-                <span className="font-black text-slate-800 dark:text-white font-mono">{metrics.availability.toFixed(1)}%</span>
+                <span className="font-black text-slate-800 dark:text-white font-mono">
+                  {metrics.availability.toFixed(1)}%
+                </span>
               </div>
               <div className="h-2.5 bg-slate-100 dark:bg-slate-850 rounded-full overflow-hidden flex">
                 <div className="bg-blue-500 rounded-full" style={{ width: `${metrics.availability}%` }} />
               </div>
               <div className="flex justify-between text-[9px] text-slate-400 font-bold">
                 <span>Downtime: {metrics.downtime} min</span>
-                <span>Operating Time: {metrics.plannedTime - metrics.downtime} / {metrics.plannedTime} min</span>
+                <span>
+                  Operating Time: {metrics.plannedTime - metrics.downtime} / {metrics.plannedTime} min
+                </span>
               </div>
             </div>
             <div className="space-y-1.5">
@@ -255,7 +286,9 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                 <span className="font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                   <Zap className="w-3.5 h-3.5 text-amber-500" /> Performance (Kecepatan Lini)
                 </span>
-                <span className="font-black text-slate-800 dark:text-white font-mono">{metrics.performance.toFixed(1)}%</span>
+                <span className="font-black text-slate-800 dark:text-white font-mono">
+                  {metrics.performance.toFixed(1)}%
+                </span>
               </div>
               <div className="h-2.5 bg-slate-100 dark:bg-slate-850 rounded-full overflow-hidden flex">
                 <div className="bg-amber-500 rounded-full" style={{ width: `${metrics.performance}%` }} />
@@ -270,7 +303,9 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                 <span className="font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Quality (Jaminan Mutu Part)
                 </span>
-                <span className="font-black text-slate-800 dark:text-white font-mono">{metrics.quality.toFixed(1)}%</span>
+                <span className="font-black text-slate-800 dark:text-white font-mono">
+                  {metrics.quality.toFixed(1)}%
+                </span>
               </div>
               <div className="h-2.5 bg-slate-100 dark:bg-slate-850 rounded-full overflow-hidden flex">
                 <div className="bg-emerald-500 rounded-full" style={{ width: `${metrics.quality}%` }} />
@@ -290,8 +325,12 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
             <Award className="w-4 h-4 text-indigo-500" /> OEE Weekly Historical Trend (7 Days)
           </h3>
           <div className="flex items-center gap-4 text-[9px] font-extrabold uppercase text-slate-500">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-500 block" /> Actual OEE</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 bg-amber-500 border-t border-dashed block" /> Target (85%)</span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-indigo-500 block" /> Actual OEE
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-0.5 bg-amber-500 border-t border-dashed block" /> Target (85%)
+            </span>
           </div>
         </div>
         <div className="w-full overflow-x-auto select-none pt-2">
@@ -313,12 +352,29 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
               <line x1="40" y1="110" x2="520" y2="110" stroke="#f1f5f9" strokeWidth="1" className="dark:opacity-10" />
               <line x1="40" y1="130" x2="520" y2="130" stroke="#cbd5e1" strokeWidth="1" className="dark:opacity-10" />
               <line x1="40" y1="35" x2="520" y2="35" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" />
-              <text x="525" y="38" fill="#f59e0b" className="text-[8px] font-black uppercase">85% Target</text>
-              <text x="15" y="24" fill="#94a3b8" className="text-[8px] font-bold font-mono">100%</text>
-              <text x="15" y="75" fill="#94a3b8" className="text-[8px] font-bold font-mono">50%</text>
-              <text x="15" y="133" fill="#94a3b8" className="text-[8px] font-bold font-mono">0%</text>
+              <text x="525" y="38" fill="#f59e0b" className="text-[8px] font-black uppercase">
+                85% Target
+              </text>
+              <text x="15" y="24" fill="#94a3b8" className="text-[8px] font-bold font-mono">
+                100%
+              </text>
+              <text x="15" y="75" fill="#94a3b8" className="text-[8px] font-bold font-mono">
+                50%
+              </text>
+              <text x="15" y="133" fill="#94a3b8" className="text-[8px] font-bold font-mono">
+                0%
+              </text>
               {areaPath && <path d={areaPath} fill="url(#oeeFill)" />}
-              {linePath && <path d={linePath} fill="none" stroke="url(#oeeLine)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+              {linePath && (
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="url(#oeeLine)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
               {chartPoints.map((p, idx) => (
                 <g key={idx}>
                   <circle
@@ -328,14 +384,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                     className="fill-white stroke-indigo-600 cursor-pointer transition-all hover:r-7"
                     strokeWidth="3.5"
                   />
-                  <rect
-                    x={p.x - 18}
-                    y={p.y - 18}
-                    width="36"
-                    height="11"
-                    rx="3"
-                    className="fill-slate-900/90 shadow-sm"
-                  />
+                  <rect x={p.x - 18} y={p.y - 18} width="36" height="11" rx="3" className="fill-slate-900/90 shadow-sm" />
                   <text
                     x={p.x}
                     y={p.y - 10}
@@ -345,13 +394,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                   >
                     {p.val.toFixed(0)}%
                   </text>
-                  <text
-                    x={p.x}
-                    y="148"
-                    textAnchor="middle"
-                    fill="#64748b"
-                    className="text-[8px] font-black uppercase"
-                  >
+                  <text x={p.x} y="148" textAnchor="middle" fill="#64748b" className="text-[8px] font-black uppercase">
                     {p.label}
                   </text>
                 </g>
@@ -367,13 +410,15 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
             <Printer className="w-4 h-4 text-purple-500" /> Printer Telemetry & Status
           </h3>
           <div className="space-y-3 pt-2">
-            <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${
-              isJamSimulated
-                ? 'bg-rose-50 border-rose-100 text-rose-800'
-                : printerConnected
+            <div
+              className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${
+                isJamSimulated
+                  ? 'bg-rose-50 border-rose-100 text-rose-800'
+                  : printerConnected
                   ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
                   : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}>
+              }`}
+            >
               <div className="flex items-center gap-2">
                 <Printer className="w-5 h-5 shrink-0" />
                 <div>
@@ -389,18 +434,25 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                   disabled={isConnecting}
                   className="px-2.5 py-1 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 rounded-lg text-[9px] font-extrabold uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-2.5 h-2.5 ${isConnecting ? 'animate-spin' : ''}`} /> {isConnecting ? 'Reconnecting...' : 'Reconnect'}
+                  <RefreshCw className={`w-2.5 h-2.5 ${isConnecting ? 'animate-spin' : ''}`} />{' '}
+                  {isConnecting ? 'Reconnecting...' : 'Reconnect'}
                 </button>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="block text-[8px] font-extrabold uppercase tracking-wider text-slate-400">Paper Level</span>
-                <span className="block text-base font-black text-slate-700 dark:text-white font-mono mt-0.5">{paperLevel}%</span>
+                <span className="block text-base font-black text-slate-700 dark:text-white font-mono mt-0.5">
+                  {paperLevel}%
+                </span>
               </div>
               <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] font-extrabold uppercase tracking-wider text-slate-400">Battery Capacity</span>
-                <span className="block text-base font-black text-slate-700 dark:text-white font-mono mt-0.5">{batteryLevel}%</span>
+                <span className="block text-[8px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Battery Capacity
+                </span>
+                <span className="block text-base font-black text-slate-700 dark:text-white font-mono mt-0.5">
+                  {batteryLevel}%
+                </span>
               </div>
             </div>
             <div className="flex gap-2 pt-2">
@@ -429,7 +481,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
             <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
               <Cpu className="w-4 h-4 text-blue-500" /> Active Print Queue
             </h3>
-            {printQueue.some(q => q.status === 'pending-retry') && (
+            {printQueue.some((q) => q.status === 'pending-retry') && (
               <button
                 onClick={handleClearQueue}
                 className="text-[9px] text-slate-400 hover:text-slate-600 font-extrabold uppercase tracking-wider cursor-pointer"
@@ -446,16 +498,21 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
               </div>
             ) : (
               printQueue.map((item) => (
-                <div key={item.id} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <div
+                  key={item.id}
+                  className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs"
+                >
                   <div className="min-w-0">
                     <span className="block font-bold text-slate-700 dark:text-slate-350 truncate">{item.label}</span>
                     <span className="block text-[8px] text-slate-400 font-mono mt-0.5">{item.time}</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                    item.status === 'printed'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                      item.status === 'printed'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                    }`}
+                  >
                     {item.status === 'printed' ? 'Printed' : 'Pending'}
                   </span>
                 </div>
@@ -470,17 +527,29 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
           </h3>
           <div className="space-y-3 text-[11px] leading-relaxed pt-2 text-slate-650 dark:text-slate-400">
             <div className="flex gap-2">
-              <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400 font-black shrink-0">1</span>
+              <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400 font-black shrink-0">
+                1
+              </span>
               <div>
-                <span className="block font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">No Bluetooth Signal?</span>
-                <span className="block">Check printer power. Ensure device Bluetooth is turned on, and click "Reconnect" to pair again.</span>
+                <span className="block font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">
+                  No Bluetooth Signal?
+                </span>
+                <span className="block">
+                  Check printer power. Ensure device Bluetooth is turned on, and click "Reconnect" to pair again.
+                </span>
               </div>
             </div>
             <div className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-              <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400 font-black shrink-0">2</span>
+              <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400 font-black shrink-0">
+                2
+              </span>
               <div>
-                <span className="block font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Red Light Flashing?</span>
-                <span className="block">Open printer cover, ensure paper is aligned correctly, or replace thermal receipt roll.</span>
+                <span className="block font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">
+                  Red Light Flashing?
+                </span>
+                <span className="block">
+                  Open printer cover, ensure paper is aligned correctly, or replace thermal receipt roll.
+                </span>
               </div>
             </div>
           </div>
