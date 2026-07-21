@@ -14,6 +14,40 @@ import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useScreenControls } from '../../../shared/hooks/useScreenControls';
 import { useBtPrinterStore } from '../../../shared/store/useBtPrinterStore';
 
+function playLoudKanbanBeep() {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+
+        // European Ambulance Hi-Lo Siren (Pulse 1: 960Hz square wave, Pulse 2: 770Hz square wave)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'square';
+        osc1.frequency.setValueAtTime(960, now);
+        gain1.gain.setValueAtTime(0.5, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.25);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(770, now + 0.26);
+        gain2.gain.setValueAtTime(0.5, now + 0.26);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.52);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.26);
+        osc2.stop(now + 0.52);
+    } catch (e) {
+        console.warn('Audio playback error:', e);
+    }
+}
+
 interface MachineExecutionViewProps {
     machine: string;
     factory: string;
@@ -127,7 +161,6 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
     const [selectedNgType, setSelectedNgType] = useState(NG_TYPES[0]);
     const [abnormalStartTime, setAbnormalStartTime] = useState('');
     const [ngStartTime, setNgStartTime] = useState('');
-
     // Restore "sedang diinput" panel state if user navigated away mid-reporting
     // The machine status 'Dalam Investigasi...' is persisted in context, so we
     // use it to rehydrate the local UI state on mount / planKey change.
@@ -138,7 +171,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         } else {
             setIsReportingAbnormal(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [planKey]);
 
     useEffect(() => {
@@ -148,7 +181,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         } else {
             setIsReportingNg(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [planKey]);
 
     // Live ticking clock for print lock calculations (ticks every 10 seconds)
@@ -161,12 +194,12 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
     }, []);
 
     // ── Bluetooth: consume from global store (survives page navigation) ──────
-    const btDevice           = useBtPrinterStore(s => s.btDevice);
-    const btCharacteristic   = useBtPrinterStore(s => s.btCharacteristic);
-    const connectionStatus   = useBtPrinterStore(s => s.connectionStatus);
-    const connectionError    = useBtPrinterStore(s => s.connectionError);
-    const onDeviceConnected  = useBtPrinterStore(s => s.onDeviceConnected);
-    const btDisconnect       = useBtPrinterStore(s => s.disconnect);
+    const btDevice = useBtPrinterStore(s => s.btDevice);
+    const btCharacteristic = useBtPrinterStore(s => s.btCharacteristic);
+    const connectionStatus = useBtPrinterStore(s => s.connectionStatus);
+    const connectionError = useBtPrinterStore(s => s.connectionError);
+    const onDeviceConnected = useBtPrinterStore(s => s.onDeviceConnected);
+    const btDisconnect = useBtPrinterStore(s => s.disconnect);
     const findWriteCharacteristic = useBtPrinterStore(s => s.findWriteCharacteristic);
 
     const isBtConnected = connectionStatus === 'connected';
@@ -316,6 +349,34 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
 
         return { isLocked, message };
     }, [activeJob, currentLiveTime, abnormality, ngState]);
+
+    // Looping audio alarm for Member portal when Kanban printing is unlocked & ready
+    useEffect(() => {
+        const shouldPlayLoop =
+            activePortal === 'member' &&
+            activeJob !== null &&
+            activeJob.status === 'running' &&
+            activeJob.actualQty < activeJob.qtyLot &&
+            !printLockStatus.isLocked &&
+            !showPrintModal &&
+            !abnormality.isAbnormal &&
+            !ngState.isNg &&
+            !isReadOnlyMode;
+
+        if (!shouldPlayLoop) return;
+
+        // Play sound immediately when ready
+        playLoudKanbanBeep();
+
+        // Loop audio alarm every 2 seconds until member clicks Print Kanban (showPrintModal) or status changes
+        const intervalId = setInterval(() => {
+            playLoudKanbanBeep();
+        }, 2000);
+
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [activePortal, activeJob, printLockStatus.isLocked, showPrintModal, abnormality.isAbnormal, ngState.isNg, isReadOnlyMode]);
 
     const shiftStartStatus = useMemo(() => {
         if (!activeJob) return { isBeforeStart: false, startTimeStr: '' };
@@ -570,7 +631,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
         <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-900 p-4 sm:p-6 space-y-5">
 
             {/* Fullscreen & Always Awake Toolbar */}
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                     onClick={toggleWakeLock}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${isWakeLockActive
@@ -1176,7 +1237,7 @@ export function MachineExecutionView({ machine, factory, machineKey: propsMachin
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">NG Qty</label>
-                                    <input type="number" min={0} value={signOffNgQty} 
+                                    <input type="number" min={0} value={signOffNgQty}
                                         onChange={e => {
                                             const ngVal = e.target.value;
                                             setSignOffNgQty(ngVal);
