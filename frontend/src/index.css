@@ -120,23 +120,52 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation-delay: 0.55s;
 }
 
-/* === NG (QUALITY ISSUE ONGOING) WAVE EFFECT — amber/yellow === */
-.ng-wave-wrapper {
-  position: relative;
-  display: inline-flex;
+/* === TOAST NOTIFICATION SLIDE & FADE ANIMATIONS === */
+@keyframes toast-slide-in-desktop {
+  0% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.ng-wave-wrapper::before,
-.ng-wave-wrapper::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 0.375rem;
-  border: 2px solid rgba(245, 158, 11, 0.75);
-  animation: abnormal-wave 1.5s ease-out infinite;
-  pointer-events: none;
+@keyframes toast-slide-in-mobile {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.ng-wave-wrapper::after {
-  animation-delay: 0.2s;
+@keyframes toast-progress-shrink {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
 }
+
+/* Mobile first: Slide in from bottom to top */
+.toast-animate-in {
+  animation: toast-slide-in-mobile 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Desktop (>= 640px): Slide in from top to bottom */
+@media (min-width: 640px) {
+  .toast-animate-in {
+    animation: toast-slide-in-desktop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+.toast-progress-bar {
+  animation: toast-progress-shrink 4s linear forwards;
+}
+
+
