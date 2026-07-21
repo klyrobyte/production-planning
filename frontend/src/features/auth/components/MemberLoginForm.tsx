@@ -1,116 +1,31 @@
-import React, { useState, useEffect } from 'react';
 import { Lock, User, AlertCircle, ArrowLeft } from 'lucide-react';
-import { useAuthStore } from '../../../shared/store/useAuthStore';
-import { useThemeStore } from '../../../shared/store/useThemeStore';
-import api from '../../../shared/lib/axios';
+import type { MemberLoginFormProps } from '../context/AuthTypes';
+import { useAuthContext } from '../context/AuthContext';
 
-interface FactoryData {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface MachineData {
-  id: string;
-  code: string;
-  name: string;
-  tonnage: string;
-}
-
-interface MemberLoginFormProps {
-  onBack: () => void;
-}
-
-// Render form to authenticate operator member session for a specific injection machine
 export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
-  const verifyOperatorPin = useAuthStore((state) => state.verifyOperatorPin);
-  const colorPrimary = useThemeStore((state) => state.colorPrimary);
-
-  const [factories, setFactories] = useState<FactoryData[]>([]);
-  const [machines, setMachines] = useState<MachineData[]>([]);
-  const [selectedFactoryId, setSelectedFactoryId] = useState('');
-  const [selectedMachineId, setSelectedMachineId] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [pin, setPin] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch factories list on component mount
-  useEffect(() => {
-    const loadFactories = async () => {
-      try {
-        const res = await api.get('/factories');
-        const list = res.data.data || [];
-        setFactories(list);
-        if (list.length > 0) {
-          setSelectedFactoryId(list[0].id);
-        }
-      } catch (err) {
-        console.error('Failed to load factories:', err);
-      }
-    };
-    loadFactories();
-  }, []);
-
-  // Fetch machines when selected factory changes
-  useEffect(() => {
-    if (!selectedFactoryId) return;
-    const loadMachines = async () => {
-      try {
-        const res = await api.get(`/machines?factory_id=${selectedFactoryId}`);
-        const list = res.data.data || [];
-        setMachines(list);
-        if (list.length > 0) {
-          setSelectedMachineId(list[0].id);
-        } else {
-          setSelectedMachineId('');
-        }
-      } catch (err) {
-        console.error('Failed to load machines:', err);
-      }
-    };
-    loadMachines();
-  }, [selectedFactoryId]);
-
-  // Handle operator PIN verification
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!selectedMachineId) {
-      setError('Silakan pilih mesin terlebih dahulu.');
-      return;
-    }
-    if (memberName.trim().length === 0) {
-      setError('Nama operator wajib diisi.');
-      return;
-    }
-    if (pin.length !== 4) {
-      setError('PIN harus berupa 4 karakter alfanumerik.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const factoryObj = factories.find(f => f.id === selectedFactoryId);
-      const factoryName = factoryObj ? factoryObj.name : '';
-      const machineObj = machines.find(m => m.id === selectedMachineId);
-      const machineName = machineObj ? machineObj.name : '';
-      const machineCode = machineObj ? machineObj.code : '';
-      await verifyOperatorPin(selectedFactoryId, factoryName, selectedMachineId, machineName, machineCode, pin, memberName.trim());
-    } catch (err: any) {
-      const responseData = err.response?.data;
-      const message = responseData?.message || 'PIN tidak valid atau terjadi kesalahan koneksi.';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const {
+    colorPrimary,
+    factories,
+    machines,
+    selectedFactoryId,
+    setSelectedFactoryId,
+    selectedMachineId,
+    setSelectedMachineId,
+    memberName,
+    setMemberName,
+    pin,
+    setPin,
+    memberError,
+    isMemberLoading,
+    handleMemberSubmit,
+  } = useAuthContext();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleMemberSubmit} className="space-y-4">
       <div className="space-y-1.5 text-left">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Pilih Pabrik</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          Pilih Pabrik
+        </label>
         <select
           value={selectedFactoryId}
           onChange={(e) => setSelectedFactoryId(e.target.value)}
@@ -125,14 +40,18 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
       </div>
 
       <div className="space-y-1.5 text-left">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Pilih Mesin</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          Pilih Mesin
+        </label>
         <select
           value={selectedMachineId}
           onChange={(e) => setSelectedMachineId(e.target.value)}
           className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3.5 py-3 text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 cursor-pointer"
         >
           {machines.length === 0 ? (
-            <option value="" className="dark:bg-slate-900">Tidak ada mesin aktif</option>
+            <option value="" className="dark:bg-slate-900">
+              Tidak ada mesin aktif
+            </option>
           ) : (
             machines.map((m) => (
               <option key={m.id} value={m.id} className="dark:bg-slate-900">
@@ -144,7 +63,9 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
       </div>
 
       <div className="space-y-1.5 text-left">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Nama Operator</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          Nama Operator
+        </label>
         <div className="relative">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 dark:text-slate-500">
             <User className="h-4 w-4" />
@@ -161,7 +82,9 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
       </div>
 
       <div className="space-y-1.5 text-left">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">PIN Mesin (4 Digit)</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          PIN Mesin (4 Digit)
+        </label>
         <div className="relative">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 dark:text-slate-500">
             <Lock className="h-4 w-4" />
@@ -178,10 +101,10 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
         </div>
       </div>
 
-      {error && (
+      {memberError && (
         <div className="flex items-center gap-2 rounded-xl border border-rose-100 dark:border-rose-950/30 bg-rose-50 dark:bg-rose-950/20 p-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 animate-pulse text-left">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
+          <span>{memberError}</span>
         </div>
       )}
 
@@ -199,11 +122,11 @@ export default function MemberLoginForm({ onBack }: MemberLoginFormProps) {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isMemberLoading}
           style={{ backgroundColor: colorPrimary }}
           className="flex-[2] flex items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-slate-200 dark:shadow-none transition hover:opacity-95 active:scale-95 disabled:opacity-50 cursor-pointer"
         >
-          {isLoading ? (
+          {isMemberLoading ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
           ) : (
             'Enter Portal'
