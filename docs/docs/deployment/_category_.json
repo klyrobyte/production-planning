@@ -1,0 +1,8 @@
+{
+  "label": "Deployment & Env",
+  "position": 9,
+  "link": {
+    "type": "generated-index",
+    "description": "Panduan langkah-langkah menjalankan aplikasi di lingkungan lokal development dan mendeploy ke server production."
+  }
+}

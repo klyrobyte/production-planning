@@ -1,0 +1,8 @@
+{
+  "label": "Pengelolaan Sistem",
+  "position": 7,
+  "link": {
+    "type": "generated-index",
+    "description": "Dokumentasi modul administratif bagi Super Admin untuk pengelolaan database master, pengguna, log audit, dan tema."
+  }
+}
