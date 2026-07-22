@@ -411,7 +411,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     const monthStr = dateStr.substring(0, 7);
     const avgKey = `${monthStr}_avg_${machineId}`;
 
-    if (machineJobs[finalKey] !== undefined) return;
+    if (machineJobs[finalKey] !== undefined && machineJobs[finalKey].length > 0) return;
 
     const initialJobs = productionService.getHeijunkaJobsForMachine(machineId, dateStr, parts);
 

@@ -6,7 +6,8 @@ import {
   Settings, 
   Database,
   Users,
-  Cpu
+  Cpu,
+  MonitorPlay
 } from 'lucide-react';
 import type { UserRole } from '../store/useAuthStore';
 
@@ -26,6 +27,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     label: '3M Dashboard',
     path: '/dashboard',
     icon: LayoutDashboard,
+    allowedRoles: ['super-admin', 'planner', 'leader'],
+  },
+  {
+    id: 'board',
+    label: 'Production Board',
+    path: '/board',
+    icon: MonitorPlay,
     allowedRoles: ['super-admin', 'planner', 'leader', 'production-board'],
   },
   {

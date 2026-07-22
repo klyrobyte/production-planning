@@ -43,6 +43,7 @@ import MachinesPage from './features/machines/pages/MachinesPage';
 import DatabasePage from './features/database/pages/DatabasePage';
 import OrdersPage from './features/orders/pages/OrdersPage';
 import ProductionPage from './features/production/pages/ProductionPage';
+import BoardPage from './features/board/pages/BoardPage';
 
 // Core App bootstrap layout logic
 function AppContent() {
@@ -50,6 +51,7 @@ function AppContent() {
   const checkSession = useAuthStore((state) => state.checkSession);
   const isCheckingSession = useAuthStore((state) => state.isCheckingSession);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const activePortal = useAuthStore((state) => state.activePortal);
 
   // Global Bluetooth manager — keeps connection alive across page navigations
   useBtPrinterManager();
@@ -79,8 +81,15 @@ function AppContent() {
 
         {/* Protected Area wrapping inside PageLayout Shell */}
         <Route element={<ProtectedRoute />}>
+          {/* Full Screen Board Page */}
+          <Route element={<ProtectedRoute allowedRoles={['super-admin', 'production-board']} />}>
+            <Route path="/board" element={<BoardPage />} />
+            <Route path="/board/:machine" element={<BoardPage />} />
+            <Route path="/board/:machine/:tab" element={<BoardPage />} />
+          </Route>
+
           <Route element={<PageLayout />}>
-            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner', 'leader', 'production-board']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner', 'leader']} />}>
               <Route path="/dashboard" element={<DashboardPlaceholder />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={['super-admin', 'planner']} />}>
@@ -109,7 +118,7 @@ function AppContent() {
         <Route
           path="/"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+            isAuthenticated ? (activePortal === 'production-board' ? <Navigate to="/board" replace /> : <Navigate to="/dashboard" replace />) : <Navigate to="/login" replace />
           }
         />
 

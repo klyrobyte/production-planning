@@ -126,7 +126,7 @@ export default function MachineFormModal() {
               type="text"
               value={machineTonnage}
               onChange={(e) => setMachineTonnage(e.target.value)}
-              placeholder="Contoh: 2500T, 3500T"
+              placeholder="Contoh: 2500, 3500"
               className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
             />
           </div>

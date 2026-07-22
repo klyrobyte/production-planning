@@ -359,43 +359,67 @@ function ShiftTimeline({
       if (job.actualDandoriEnd) {
         dEndStr = job.actualDandoriEnd;
       } else {
-        if (job.status === 'dandori') {
+        if (job.status === 'dandori' && currentClockTime) {
           dEndStr = currentClockTime;
         } else {
-          dEndStr = dStartStr;
+          // For historical dates: use dandori start + dandori duration
+          if (dStartStr && job.dandori) {
+            const [hh, mm] = dStartStr.split(':').map(Number);
+            const totalMins = hh * 60 + mm + (job.dandori || 0);
+            const endHh = Math.floor(totalMins / 60) % 24;
+            const endMm = totalMins % 60;
+            dEndStr = `${String(endHh).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`;
+          } else {
+            dEndStr = dStartStr;
+          }
         }
       }
 
       if (job.actualProductionStart) {
         pStartStr = job.actualProductionStart;
       } else {
-        pStartStr = dEndStr || currentClockTime;
+        pStartStr = dEndStr || dStartStr || '07:30';
       }
 
       if (job.actualProductionEnd) {
         pEndStr = job.actualProductionEnd;
       } else {
-        if (job.status === 'running') {
+        if (job.status === 'running' && currentClockTime) {
           pEndStr = currentClockTime;
+        } else if (job.time) {
+          // For historical dates or non-running: use production start + time duration
+          const [hh, mm] = pStartStr.split(':').map(Number);
+          const totalMins = hh * 60 + mm + (job.time || 0);
+          const endHh = Math.floor(totalMins / 60) % 24;
+          const endMm = totalMins % 60;
+          pEndStr = `${String(endHh).padStart(2, '0')}:${String(endMm).padStart(2, '0')}`;
         } else {
           pEndStr = pStartStr;
         }
       }
 
-      const [hhStr, mmStr] = pEndStr.split(':');
-      const hh = parseInt(hhStr, 10);
-      const mm = parseInt(mmStr, 10);
-
-      const newClock = new Date(dayStart);
-      newClock.setHours(hh, mm, 0, 0);
-
-      if (job.shift === 'night') {
-        if (hh < 12) {
+      if (!pEndStr || !pEndStr.includes(':')) {
+        actualTimes[job.id] = { dandoriStartStr: dStartStr, dandoriEndStr: dEndStr, productionStartStr: pStartStr, productionEndStr: pStartStr };
+      } else {
+        const [hhStr, mmStr] = pEndStr.split(':');
+        const hh = parseInt(hhStr, 10);
+        const mm = parseInt(mmStr, 10);
+        const newClock = new Date(dayStart);
+        newClock.setHours(hh, mm, 0, 0);
+        if (job.shift === 'night' && hh < 12) {
           newClock.setDate(newClock.getDate() + 1);
         }
-        lastNightEndTime = newClock;
-      } else {
-        lastDayEndTime = newClock;
+        if (job.shift === 'night') {
+          lastNightEndTime = newClock;
+        } else {
+          lastDayEndTime = newClock;
+        }
+        actualTimes[job.id] = {
+          dandoriStartStr: dStartStr,
+          dandoriEndStr: dEndStr,
+          productionStartStr: pStartStr,
+          productionEndStr: pEndStr,
+        };
       }
     } else {
       let runningClock = new Date();
@@ -419,13 +443,13 @@ function ShiftTimeline({
       }
 
       let pStart = new Date(runningClock);
-      let pMins = job.time;
+      let pMins = job.time || 0;
       const pEnd = addWorkingMinutes(pStart, pMins, dOT, nOT);
       runningClock = pEnd;
 
       let dStart = new Date(runningClock);
       let dEnd = new Date(runningClock);
-      const dMins = job.dandori;
+      const dMins = job.dandori || 0;
       if (dMins > 0 && job.shift !== 'overflow') {
         dEnd = addWorkingMinutes(dStart, dMins, dOT, nOT);
         runningClock = dEnd;
@@ -841,12 +865,12 @@ function ShiftTimeline({
                         if (!actTime) return null;
 
                         let dandoriElement = null;
-                        if (job.dandori > 0 && (job.status === 'completed' || job.status === 'running')) {
+                        if (job.dandori > 0 && (job.status === 'completed' || job.status === 'running' || job.status === 'dandori')) {
                           const dStartOffset = getMinutesOffset(actTime.dandoriStartStr);
                           const dEndOffset = getMinutesOffset(actTime.dandoriEndStr);
                           const dLeftPercent = (dStartOffset / totalMins) * 100;
                           const dWidthPercent = ((dEndOffset - dStartOffset) / totalMins) * 100;
-
+                          
                           if (dWidthPercent > 0) {
                             dandoriElement = (
                               <div
@@ -896,7 +920,14 @@ function ShiftTimeline({
                           }
                         }
 
-                        if (job.status === 'dandori') return null;
+                        if (job.status === 'dandori') {
+                          return (
+                            <React.Fragment key={`act-group-${job.id}`}>
+                              {dandoriElement}
+                              {finalDandoriElement}
+                            </React.Fragment>
+                          );
+                        }
 
                         const startOffset = getMinutesOffset(actTime.productionStartStr);
                         let endOffset = getMinutesOffset(actTime.productionEndStr);

@@ -71,7 +71,9 @@ export default function LoginPage() {
 
   // Redirect logged-in non-members, or logged-in members who are also operator authenticated
   if (isAuthenticated && user) {
-    if (user.role !== 'member') {
+    if (user.role === 'production-board') {
+      return <Navigate to="/board" replace />;
+    } else if (user.role !== 'member') {
       return <Navigate to="/dashboard" replace />;
     } else if (isOperatorAuthenticated && activeMachineCode) {
       return <Navigate to={`/production/${activeMachineCode}/execution`} replace />;
