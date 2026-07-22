@@ -358,8 +358,9 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
 
   // Connects Socket.io client and binds broadcast listeners for real-time telemetry updates
   useEffect(() => {
-    fetchPlans();
     if (!isAuthenticated) return;
+    
+    fetchPlans();
 
     const socket = initSocket();
     socket.connect();

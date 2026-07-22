@@ -71,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch Factories on mount
   useEffect(() => {
+    if (!isAuthenticated) return;
     let isMounted = true;
     authService.getFactories().then((list) => {
       if (!isMounted) return;

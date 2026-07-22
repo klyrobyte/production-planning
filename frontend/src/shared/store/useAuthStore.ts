@@ -87,6 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         isAuthenticated: true,
         activePortal: userData.role,
       });
+      localStorage.setItem('sugity_device_session', 'true');
     },
 
     // Log out workstation device and clear session cookie
@@ -98,6 +99,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       } finally {
         destroySocket();
         get().logoutOperator();
+        localStorage.removeItem('sugity_device_session');
         set({
           user: null,
           isAuthenticated: false,
@@ -108,6 +110,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     // Verify current workstation device session status on app mount
     checkSession: async () => {
+      const hasSession = localStorage.getItem('sugity_device_session');
+      if (!hasSession) {
+        set({ isCheckingSession: false, isAuthenticated: false, user: null, activePortal: 'guest' });
+        return;
+      }
+
       set({ isCheckingSession: true });
       try {
         const meResponse = await api.get('/auth/me');
