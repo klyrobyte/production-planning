@@ -178,6 +178,8 @@ docker compose ps
 ```
 
 > **Catatan**: `init.sql` otomatis dijalankan saat volume PostgreSQL pertama kali dibuat. Jika perlu reset schema: `docker compose down -v && docker compose up -d`.
+> 
+> ⚠️ **Catatan Tambahan**: Jika berkas database `init.sql` beserta data seeder lainnya belum tersedia di proyek Anda, harap hubungi Author untuk mendapatkan salinan berkas tersebut. Seluruh berkas SQL database tersebut wajib diletakkan di dalam direktori `backend/src/database/` (skema migrasi di sub-folder `/migrations/` dan seeder di sub-folder `/seeds/`) agar dapat dibaca dengan benar oleh konfigurasi Docker dan skrip migrasi.
 
 ### 3. Seed data awal
 

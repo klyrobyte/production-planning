@@ -39,6 +39,10 @@ Di root folder proyek (`d:\sugity\production-planning\`), salin berkas environme
 
 ## Langkah 2: Seeding Data Awal ke Database
 
+:::info Catatan Keberadaan File SQL
+Jika berkas database `init.sql` beserta berkas seeder `.sql` lainnya belum tersedia di proyek lokal Anda, silakan hubungi Author untuk mendapatkan berkas database terkait. Seluruh berkas SQL database tersebut wajib diletakkan di dalam direktori `backend/src/database/` (skema migrasi di sub-folder `/migrations/` dan seeder di sub-folder `/seeds/`) agar dapat dibaca dengan benar oleh konfigurasi Docker dan skrip migrasi.
+:::
+
 Database Anda saat ini masih kosong. Anda perlu mengimpor skema database dan data awal (seeding) untuk mendaftarkan user bawaan, pabrik, mesin cetak, data part, dan data konversi Sebango:
 
 1.  Salin file-file SQL di folder `backend/src/database/seeds/` ke dalam kontainer database Docker Anda:
