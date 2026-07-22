@@ -9,19 +9,17 @@ import BoardHeader from '../components/BoardHeader';
 import BoardFactoryRow from '../components/BoardFactoryRow';
 
 function BoardPageContent() {
-  const { 
-    factoryRows, 
+  const {
+    factoryRows,
     maxCols,
-    selectedMachine, 
-    setSelectedMachine, 
+    selectedMachine,
+    setSelectedMachine,
     timeStr,
     dateStr,
-    todayStr,
     selectedDate,
-    setSelectedDate, 
-    activePortal 
+    activePortal
   } = useBoardContext();
-  
+
   const logoutDevice = useAuthStore(state => state.logoutDevice);
   const userRole = useAuthStore(state => state.user?.role);
   const navigate = useNavigate();
@@ -80,7 +78,7 @@ function BoardPageContent() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 select-none overflow-hidden">
-      <BoardHeader 
+      <BoardHeader
         timeStr={timeStr}
         dateStr={dateStr}
         userRole={userRole}
@@ -97,9 +95,9 @@ function BoardPageContent() {
         )}
 
         {factoryRows.map(fact => (
-          <BoardFactoryRow 
-            key={fact.name} 
-            factoryRow={fact} 
+          <BoardFactoryRow
+            key={fact.name}
+            factoryRow={fact}
             maxCols={maxCols}
             resolveStatus={boardService.resolveStatus}
             onMachineClick={handleMachineClick}
