@@ -358,7 +358,7 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
             <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-amber-600" />
               Backup Part List
-              <span className="bg-amber-100 dark:bg-amber-955/20 text-amber-700 dark:text-amber-455 px-3 py-1 rounded-full text-xs uppercase tracking-wider ml-2">
+              <span className="bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full text-xs uppercase tracking-wider ml-2">
                 {backupLineParts.length} Parts
               </span>
             </h3>
@@ -367,7 +367,7 @@ export function MachinePartListView({ machine, factory, machineKey: propsMachine
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 text-left rounded-xl shadow-sm overflow-hidden transition-all">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left rounded-xl shadow-sm overflow-hidden transition-all">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

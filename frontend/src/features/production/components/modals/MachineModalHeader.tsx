@@ -41,7 +41,7 @@ export const MachineModalHeader: React.FC<MachineModalHeaderProps> = ({
   currentTime,
 }) => {
   const navigate = useNavigate();
-  const { memberName, logoutOperator, logoutDevice, activePortal } = useAuthStore();
+  const { logoutOperator, logoutDevice, activePortal } = useAuthStore();
   const systemLogo = useThemeStore((state) => state.systemLogo);
 
   const formattedMachineName = `Machine ${machine}`;
@@ -111,34 +111,31 @@ export const MachineModalHeader: React.FC<MachineModalHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto justify-end">
-          <div className="h-8.5 sm:h-10 flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner gap-0.5 shrink-0 overflow-x-auto max-w-full">
+          <div className="h-8.5 sm:h-10 flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner gap-0.5 shrink-0 overflow-x-auto max-w-full no-scrollbar">
             <button
               onClick={() => navigate(`/production/${machineKey}/partlist`)}
-              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-                activeTab === 'partlist'
+              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'partlist'
                   ? 'bg-[#008d51] text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-              }`}
+                }`}
             >
               <Database className="w-3 h-3 shrink-0" /> Part List
             </button>
             <button
               onClick={() => navigate(`/production/${machineKey}/execution`)}
-              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-                activeTab === 'execution'
+              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'execution'
                   ? 'bg-[#008d51] text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-              }`}
+                }`}
             >
               <Kanban className="w-3 h-3 shrink-0" /> Execute
             </button>
             <button
               onClick={() => navigate(`/production/${machineKey}/pattern`)}
-              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-                activeTab === 'pattern'
+              className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'pattern'
                   ? 'bg-[#008d51] text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-              }`}
+                }`}
             >
               <List className="w-3 h-3 shrink-0" /> Pattern View
             </button>
@@ -227,44 +224,40 @@ export const MachineModalHeader: React.FC<MachineModalHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto justify-end">
-        <div className="h-8.5 sm:h-10 flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner gap-0.5 shrink-0 overflow-x-auto max-w-full">
+        <div className="h-8.5 sm:h-10 flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner gap-0.5 shrink-0 overflow-x-auto max-w-full no-scrollbar">
           <button
             onClick={() => navigate(`/production/${machineKey}/partlist`)}
-            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-              activeTab === 'partlist'
+            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'partlist'
                 ? 'bg-[#008d51] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-            }`}
+              }`}
           >
             <Database className="w-3 h-3 shrink-0" /> Part List
           </button>
           <button
             onClick={() => navigate(`/production/${machineKey}/execution`)}
-            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-              activeTab === 'execution'
+            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'execution'
                 ? 'bg-[#008d51] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-            }`}
+              }`}
           >
             <Kanban className="w-3 h-3 shrink-0" /> Execute
           </button>
           <button
             onClick={() => navigate(`/production/${machineKey}/pattern`)}
-            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-              activeTab === 'pattern'
+            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'pattern'
                 ? 'bg-[#008d51] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-            }`}
+              }`}
           >
             <List className="w-3 h-3 shrink-0" /> Pattern View
           </button>
           <button
             onClick={() => navigate(`/production/${machineKey}/oee`)}
-            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${
-              activeTab === 'oee'
+            className={`h-7.5 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-150 whitespace-nowrap ${activeTab === 'oee'
                 ? 'bg-[#008d51] text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/40'
-            }`}
+              }`}
           >
             <BarChart2 className="w-3 h-3 shrink-0" /> OEE & Diag
           </button>
