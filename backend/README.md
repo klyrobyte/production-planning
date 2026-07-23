@@ -69,13 +69,19 @@ REST API untuk sistem **Production Planning & Shopfloor Execution** PT. Sugity C
 - **Bulk insert snapshot** (planner) — Setiap kali planner upload forecast baru, snapshot seluruh data disimpan dengan `batch_id` yang sama. Audit trail permanen.
 - **List history** (planner) — Query semua snapshot historis.
 
-### 🪵 Global Logs (Audit Trail)
+### 🪵 Global Logs (Audit Trail - Redis Capped List)
 
-- **Pencatatan otomatis semua API request** — Middleware `auditLogMiddleware` dipasang global, mencatat setiap request ke tabel `global_logs` secara **async fire-and-forget** (tidak menambah latency response).
+- **Pencatatan otomatis semua API request** — Middleware `auditLogMiddleware` dipasang global, mencatat setiap request ke Redis list (`audit_logs`) secara **async fire-and-forget** (tidak menambah latency response) dengan kapasitas maksimal 50.000 log untuk menghindari memory bloat.
 - **Data yang dicatat**: timestamp, username, role, HTTP method, endpoint path, IP address (mendukung `X-Forwarded-For` reverse proxy), status code, dan response time (ms).
 - **Request unauthenticated tetap dicatat** — username dan role akan `NULL`, IP tetap tercatat. Berguna untuk mendeteksi brute force.
 - **Endpoint yang dikecualikan**: `/health` dan `/api/docs` (terlalu noisy).
-- **CRUD untuk super-admin** — `GET /api/global-logs` dengan filter (username, method, status_code, endpoint, date range) dan pagination. `DELETE /api/global-logs` untuk clear semua log.
+- **CRUD untuk super-admin** — `GET /api/global-logs` dengan filter (username, method, status_code, endpoint, date range) dan pagination. `DELETE /api/global-logs` untuk clear semua log dari Redis.
+
+### 🖨️ Bluetooth Printers (Registrasi & Manajemen Printer)
+
+- **Registrasi Otomatis** — `POST /api/bt-printers/register` dipanggil otomatis ketika tablet di shopfloor terhubung ke printer Bluetooth. Melakukan *upsert* berdasarkan `service_uuid`. Dapat diakses oleh semua user terautentikasi.
+- **Fetch Daftar Printer** — `GET /api/bt-printers` digunakan oleh tablet saat startup untuk memuat semua printer terdaftar beserta UUID layanannya. Dapat diakses oleh semua user terautentikasi.
+- **Manajemen Manual (CRUD)** — `POST /api/bt-printers`, `PUT /api/bt-printers/:id`, dan `DELETE /api/bt-printers/:id` membolehkan super-admin atau planner untuk mengelola data printer terdaftar secara manual.
 
 ### 🎨 Site Config (Konfigurasi Tema)
 
@@ -115,11 +121,12 @@ Logic bisnis domain pabrik dipisahkan dari HTTP layer sebagai pure functions yan
          │                             │
          ▼                             ▼
 ┌─────────────────┐          ┌─────────────────────────┐
-│   PostgreSQL    │          │          Redis           │
-│                 │          │                          │
-│ - Data permanen │          │ - RBAC role cache        │
-│ - Audit logs    │          │ - Rate limit counters    │
-│ - Site config   │          │ - Site config cache      │
+│   PostgreSQL    │          │          Redis          │
+│                 │          │                         │
+│ - Data permanen │          │ - RBAC role cache       │
+│ - Site config   │          │ - Rate limit counters   │
+│                 │          │ - Site config cache     │
+│                 │          │ - Audit logs (capped)   │
 └─────────────────┘          └─────────────────────────┘
 
 Modul pattern (tiap resource):
