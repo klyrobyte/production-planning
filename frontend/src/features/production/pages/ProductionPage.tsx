@@ -14,9 +14,13 @@ export default function ProductionPage() {
 
   const activePortal = useAuthStore((state) => state.activePortal);
   const activeMachineCode = useAuthStore((state) => state.activeMachineCode);
+  const isOperatorAuthenticated = useAuthStore((state) => state.isOperatorAuthenticated);
   const logoutOperator = useAuthStore((state) => state.logoutOperator);
 
   if (activePortal === 'member') {
+    if (!isOperatorAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
     if (!urlMachine || urlMachine !== activeMachineCode) {
       return <Navigate to="/forbidden" replace />;
     }

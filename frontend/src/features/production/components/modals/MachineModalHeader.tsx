@@ -41,18 +41,19 @@ export const MachineModalHeader: React.FC<MachineModalHeaderProps> = ({
   currentTime,
 }) => {
   const navigate = useNavigate();
-  const { memberName, logoutOperator, activePortal } = useAuthStore();
+  const { memberName, logoutOperator, logoutDevice, activePortal } = useAuthStore();
   const systemLogo = useThemeStore((state) => state.systemLogo);
 
   const formattedMachineName = `Machine ${machine}`;
 
-  const handleExitMember = () => {
-    logoutOperator();
-    onClose();
+  const handleExitMember = async () => {
+    await logoutDevice();
+    navigate('/login');
   };
 
   const handleSwitchMachine = () => {
-    onClose();
+    logoutOperator();
+    navigate('/login');
   };
 
   if (activePortal === 'member') {
