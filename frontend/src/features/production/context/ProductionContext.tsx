@@ -1020,43 +1020,141 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     closeShiftRef.current = closeShiftProduction;
   }, [closeShiftProduction]);
 
-  // Auto-rollover shift evaluation every minute
+  const dayOTsRef = useRef(dayOTs);
   useEffect(() => {
-    const timer = setInterval(() => {
+    dayOTsRef.current = dayOTs;
+  }, [dayOTs]);
+
+  const nightOTsRef = useRef(nightOTs);
+  useEffect(() => {
+    nightOTsRef.current = nightOTs;
+  }, [nightOTs]);
+
+  const activeAbnormalitiesRef = useRef(activeAbnormalities);
+  useEffect(() => {
+    activeAbnormalitiesRef.current = activeAbnormalities;
+  }, [activeAbnormalities]);
+
+  const activeNgsRef = useRef(activeNgs);
+  useEffect(() => {
+    activeNgsRef.current = activeNgs;
+  }, [activeNgs]);
+
+  const machinesDataRef = useRef(machinesData);
+  useEffect(() => {
+    machinesDataRef.current = machinesData;
+  }, [machinesData]);
+
+  const setMachineAbnormalRef = useRef(setMachineAbnormal);
+  useEffect(() => {
+    setMachineAbnormalRef.current = setMachineAbnormal;
+  }, [setMachineAbnormal]);
+
+  const setMachineNgRef = useRef(setMachineNg);
+  useEffect(() => {
+    setMachineNgRef.current = setMachineNg;
+  }, [setMachineNg]);
+
+  // Global background shift rollover check (evaluates every 10 seconds ONLY for today's active production date)
+  useEffect(() => {
+    const checkShiftRollover = () => {
       const now = new Date();
-      const hh = now.getHours();
-      const mm = now.getMinutes();
-      const dateStr = productionService.getTodayDateString();
+      const todayDate = productionService.getTodayDateString();
+      const currentJobsMap = machineJobsRef.current || {};
+      const allKeys = Object.keys(currentJobsMap).filter(
+        (k) => k.startsWith(`${todayDate}_`) && !k.includes('_avg_')
+      );
 
-      // Auto close day shift at 19:00
-      if (hh === 19 && mm === 0) {
-        const machineKeys = Object.keys(machineJobsRef.current).filter((k) => k.startsWith(dateStr));
-        machineKeys.forEach((key) => {
-          const machineId = key.split('_')[1];
-          if (machineId) {
-            closeShiftRef.current(machineId, 'day', dateStr);
+      allKeys.forEach((planKey) => {
+        const parts = planKey.split('_');
+        if (parts.length < 2) return;
+        const dateStr = parts[0];
+        const machineKey = parts[1];
+        if (!dateStr || !machineKey) return;
+
+        const jobs = currentJobsMap[planKey] || [];
+        if (jobs.length === 0) return;
+
+        const dayOT = dayOTsRef.current[planKey] || 'teiji';
+        const nightOT = nightOTsRef.current[planKey] || 'teiji';
+        const abnormality = activeAbnormalitiesRef.current[planKey];
+        const ngState = activeNgsRef.current[planKey];
+
+        const mcObj = (machinesDataRef.current || []).find((m: any) => m.code === machineKey);
+        const mName = mcObj ? mcObj.name : `MC ${machineKey}`;
+
+        const memberName = useAuthStore.getState().memberName;
+        const activePortal = useAuthStore.getState().activePortal;
+        const userInitials = memberName
+          ? memberName
+              .trim()
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .substring(0, 3)
+              .toUpperCase()
+          : activePortal === 'member'
+          ? 'MB'
+          : 'SYS';
+
+        const dayJobs = jobs.filter((j) => j.shift === 'day');
+        const nightJobs = jobs.filter((j) => j.shift === 'night');
+
+        // 1. Evaluate Day Shift Closure (Fixed: 19:00 WIB)
+        if (dayJobs.length > 0) {
+          const dayEndStr = '19:00';
+          const [h, m] = dayEndStr.split(':').map((n) => parseInt(n, 10));
+          const dayEndClock = new Date(dateStr + 'T00:00:00');
+          dayEndClock.setHours(h, m, 0, 0);
+
+          const isDayShiftPending = dayJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
+          if (now.getTime() >= dayEndClock.getTime() && isDayShiftPending) {
+            if (abnormality?.isAbnormal) {
+              setMachineAbnormalRef.current(machineKey, false, undefined, undefined, dateStr, {
+                type: 'success',
+                note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
+              });
+            }
+            if (ngState?.isNg) {
+              setMachineNgRef.current(machineKey, false, undefined, undefined, dateStr, {
+                type: 'success',
+                note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
+              });
+            }
+            closeShiftRef.current(machineKey, 'day', dateStr, userInitials, mName, true);
           }
-        });
-      }
+        }
 
-      // Auto close night shift at 07:15
-      if (hh === 7 && mm === 15) {
-        const prevDate = new Date();
-        prevDate.setDate(prevDate.getDate() - 1);
-        const pyyyy = prevDate.getFullYear();
-        const pmm = String(prevDate.getMonth() + 1).padStart(2, '0');
-        const pdd = String(prevDate.getDate()).padStart(2, '0');
-        const prevDateStr = `${pyyyy}-${pmm}-${pdd}`;
+        // 2. Evaluate Night Shift Closure (Fixed: 07:00 WIB)
+        if (nightJobs.length > 0) {
+          const nightEndStr = '07:00';
+          const [h, m] = nightEndStr.split(':').map((n) => parseInt(n, 10));
+          const nightEndClock = new Date(dateStr + 'T00:00:00');
+          nightEndClock.setDate(nightEndClock.getDate() + 1);
+          nightEndClock.setHours(h, m, 0, 0);
 
-        const machineKeys = Object.keys(machineJobsRef.current).filter((k) => k.startsWith(prevDateStr));
-        machineKeys.forEach((key) => {
-          const machineId = key.split('_')[1];
-          if (machineId) {
-            closeShiftRef.current(machineId, 'night', prevDateStr);
+          const isNightShiftPending = nightJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
+          if (now.getTime() >= nightEndClock.getTime() && isNightShiftPending) {
+            if (abnormality?.isAbnormal) {
+              setMachineAbnormalRef.current(machineKey, false, undefined, undefined, dateStr, {
+                type: 'success',
+                note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
+              });
+            }
+            if (ngState?.isNg) {
+              setMachineNgRef.current(machineKey, false, undefined, undefined, dateStr, {
+                type: 'success',
+                note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
+              });
+            }
+            closeShiftRef.current(machineKey, 'night', dateStr, userInitials, mName, true);
           }
-        });
-      }
-    }, 60000);
+        }
+      });
+    };
+
+    checkShiftRollover();
+    const timer = setInterval(checkShiftRollover, 10000);
     return () => clearInterval(timer);
   }, []);
 

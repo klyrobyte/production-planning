@@ -25,6 +25,8 @@ interface SiteConfigContextType {
   setBrowserTitleInput: (val: string) => void;
   machineTypesInput: string;
   setMachineTypesInput: (val: string) => void;
+  abnormalityTypesInput: string;
+  setAbnormalityTypesInput: (val: string) => void;
 
   // Theme Action States
   isSaving: boolean;
@@ -68,6 +70,7 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
   const systemLogo = useThemeStore((state) => state.systemLogo);
   const browserTitle = useThemeStore((state) => state.browserTitle);
   const machineTypes = useThemeStore((state) => state.machineTypes);
+  const abnormalityTypes = useThemeStore((state) => state.abnormalityTypes);
   const updateTheme = useThemeStore((state) => state.updateTheme);
 
   // Form Input States
@@ -78,6 +81,7 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
   const [logoInput, setLogoInput] = useState(systemLogo);
   const [browserTitleInput, setBrowserTitleInput] = useState(browserTitle);
   const [machineTypesInput, setMachineTypesInput] = useState(machineTypes);
+  const [abnormalityTypesInput, setAbnormalityTypesInput] = useState(abnormalityTypes);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -93,7 +97,8 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
     setLogoInput(systemLogo);
     setBrowserTitleInput(browserTitle);
     setMachineTypesInput(machineTypes);
-  }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle, machineTypes]);
+    setAbnormalityTypesInput(abnormalityTypes);
+  }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle, machineTypes, abnormalityTypes]);
 
   // Logo Processor
   const processLogoFile = useCallback(async (file: File) => {
@@ -142,6 +147,7 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
         system_logo: logoInput,
         browser_title: browserTitleInput,
         machine_types: machineTypesInput,
+        abnormality_types: abnormalityTypesInput,
       });
       const msg = 'Konfigurasi berhasil disimpan dan diperbarui secara global.';
       setSuccessMsg(msg);
@@ -154,7 +160,7 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
     } finally {
       setIsSaving(false);
     }
-  }, [primaryInput, secondaryInput, navbarInput, titleInput, logoInput, browserTitleInput, machineTypesInput, updateTheme]);
+  }, [primaryInput, secondaryInput, navbarInput, titleInput, logoInput, browserTitleInput, machineTypesInput, abnormalityTypesInput, updateTheme]);
 
   // Reset Theme Config
   const handleResetTheme = useCallback(async () => {
@@ -170,6 +176,8 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
         system_logo: '',
         browser_title: 'SC Prod Plan',
         machine_types: 'injection,painting',
+        abnormality_types:
+          'Mesin Breakdown (Mekanik),Tunggu Bahan Baku,Tunggu Crane / Mold Swap,Listrik Padam,Masalah Kualitas (Investigasi),Trial Mold / Part Baru,Lainnya',
       });
       const msg = 'Branding warna dan identitas telah dikembalikan ke standar bawaan.';
       setSuccessMsg(msg);
@@ -289,6 +297,8 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
         setBrowserTitleInput,
         machineTypesInput,
         setMachineTypesInput,
+        abnormalityTypesInput,
+        setAbnormalityTypesInput,
         isSaving,
         isDragging,
         setIsDragging,

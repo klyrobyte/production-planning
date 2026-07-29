@@ -13,7 +13,7 @@ export class ProductionTimelineCalculator {
     blocks.push([1260, 1440]);
     blocks.push([0, 60]);
     blocks.push([100, 280]);
-    blocks.push([295, 435]);
+    blocks.push([295, 420]); // 04:55 - 07:00
     blocks.sort((a, b) => a[0] - b[0]);
     const merged: [number, number][] = [];
     for (const block of blocks) {

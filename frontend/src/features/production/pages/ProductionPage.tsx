@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useProduction } from '../context/ProductionContext';
@@ -26,7 +26,11 @@ export default function ProductionPage() {
     }
   }
 
-  const { activeTab, selectedDate, machinesData, allMachinesList } = useProduction();
+  const { activeTab, selectedDate, machinesData, allMachinesList, fetchPlans } = useProduction();
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
   const handleNavigateMachine = (direction: 'next' | 'prev') => {
     if (!urlMachine) return;

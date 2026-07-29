@@ -23,6 +23,7 @@ import type { Job } from '../../context/ProductionContext';
 import { PrintLabelModal } from '../modals/PrintLabelModal';
 import api from '../../../../shared/lib/axios';
 import { useAuthStore } from '../../../../shared/store/useAuthStore';
+import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import { useScreenControls } from '../../../../shared/hooks/useScreenControls';
 import { useBtPrinterStore } from '../../../../shared/store/useBtPrinterStore';
 
@@ -66,7 +67,7 @@ interface MachineExecutionViewProps {
   selectedDate: string;
 }
 
-const ABNORMAL_TYPES = [
+const DEFAULT_ABNORMAL_TYPES = [
   'Mesin Breakdown (Mekanik)',
   'Tunggu Bahan Baku',
   'Tunggu Crane / Mold Swap',
@@ -115,8 +116,6 @@ export function MachineExecutionView({
     activeAbnormalities,
     activeNgs,
     logs,
-    dayOTs,
-    nightOTs,
     updateJobStatus,
     setMachineAbnormal,
     setMachineNg,
@@ -145,7 +144,7 @@ export function MachineExecutionView({
     ? getInitials(memberName)
     : activePortal === 'member'
     ? 'MB'
-    : activePortal.substring(0, 2).toUpperCase();
+    : (activePortal || 'SYS').substring(0, 2).toUpperCase();
   const mName = machine || `MC ${machineKey}`;
 
   const getLogNote = (baseNote: string) => {
@@ -162,12 +161,17 @@ export function MachineExecutionView({
     localStorage.setItem('sugity_dev_bypass_bt', String(newVal));
   };
 
+  const abnormalityTypes = useThemeStore((state) => state.abnormalityTypes);
+  const abnormalTypeList = useMemo(() => {
+    if (!abnormalityTypes) return DEFAULT_ABNORMAL_TYPES;
+    const items = abnormalityTypes.split(',').map((s) => s.trim()).filter(Boolean);
+    return items.length > 0 ? items : DEFAULT_ABNORMAL_TYPES;
+  }, [abnormalityTypes]);
+
   const jobs = machineJobs[planKey] || [];
   const abnormality = activeAbnormalities[planKey] ?? { isAbnormal: false, type: '', start: '' };
   const ngState = activeNgs[planKey] ?? { isNg: false, type: '', start: '' };
   const logList = logs[planKey] || [];
-  const dayOT = dayOTs[planKey] || 'teiji';
-  const nightOT = nightOTs[planKey] || 'teiji';
 
   const { data: partsData = [] } = useQuery<any[]>({
     queryKey: ['parts'],
@@ -186,7 +190,7 @@ export function MachineExecutionView({
   const [leaderPin, setLeaderPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
-  const [selectedAbnType, setSelectedAbnType] = useState(ABNORMAL_TYPES[0]);
+  const [selectedAbnType, setSelectedAbnType] = useState(DEFAULT_ABNORMAL_TYPES[0]);
   const [selectedNgType, setSelectedNgType] = useState(NG_TYPES[0]);
   const [abnormalStartTime, setAbnormalStartTime] = useState('');
   const [ngStartTime, setNgStartTime] = useState('');
@@ -467,63 +471,7 @@ export function MachineExecutionView({
     });
   };
 
-  useEffect(() => {
-    if (isReadOnlyMode) return;
-    const todayDate = getTodayDateString();
-    if (selectedDate !== todayDate) return;
 
-    const dayJobs = jobs.filter((j) => j.shift === 'day');
-    const nightJobs = jobs.filter((j) => j.shift === 'night');
-
-    if (dayJobs.length > 0) {
-      const dayEndStr = dayOT === 'ot' ? '21:00' : '16:30';
-      const [h, m] = dayEndStr.split(':').map((n) => parseInt(n, 10));
-      const dayEndClock = new Date(selectedDate + 'T00:00:00');
-      dayEndClock.setHours(h, m, 0, 0);
-
-      const isDayShiftPending = dayJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
-      if (currentLiveTime.getTime() >= dayEndClock.getTime() && isDayShiftPending) {
-        if (abnormality.isAbnormal) {
-          setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
-          });
-        }
-        if (ngState.isNg) {
-          setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
-          });
-        }
-        closeShiftProduction(machineKey, 'day', selectedDate, userInitials, mName, true);
-      }
-    }
-
-    if (nightJobs.length > 0) {
-      const nightEndStr = nightOT === 'ot' ? '07:15' : '05:00';
-      const [h, m] = nightEndStr.split(':').map((n) => parseInt(n, 10));
-      const nightEndClock = new Date(selectedDate + 'T00:00:00');
-      nightEndClock.setDate(nightEndClock.getDate() + 1);
-      nightEndClock.setHours(h, m, 0, 0);
-
-      const isNightShiftPending = nightJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
-      if (currentLiveTime.getTime() >= nightEndClock.getTime() && isNightShiftPending) {
-        if (abnormality.isAbnormal) {
-          setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
-          });
-        }
-        if (ngState.isNg) {
-          setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
-          });
-        }
-        closeShiftProduction(machineKey, 'night', selectedDate, userInitials, mName, true);
-      }
-    }
-  }, [currentLiveTime, jobs, selectedDate, machineKey, mName, abnormality.isAbnormal, ngState.isNg, dayOT, nightOT, userInitials, isReadOnlyMode, closeShiftProduction, setMachineAbnormal, setMachineNg]);
 
   const handleOpenSignOff = (job: Job) => {
     setSignOffJobId(job.id);
@@ -1331,7 +1279,7 @@ export function MachineExecutionView({
                         onChange={(e) => setSelectedAbnType(e.target.value)}
                         className="w-full px-2.5 py-1.5 border border-rose-200 dark:border-rose-800 rounded text-xs font-bold bg-white dark:bg-slate-900 text-rose-900 dark:text-rose-400 outline-none focus:border-rose-400"
                       >
-                        {ABNORMAL_TYPES.map((t) => (
+                        {abnormalTypeList.map((t) => (
                           <option key={t} value={t}>
                             {t}
                           </option>

@@ -212,9 +212,10 @@ export class ProductionFukaEngine {
           const activeNgState = activeNgs[planKey];
           const isNgActive = !isAbnormal && (activeNgState ? activeNgState.isNg : false);
 
-          const isDandori = !isAbnormal && !isNgActive && (activeJob ? activeJob.status === 'dandori' : false);
-          const isRunning = !isAbnormal && !isNgActive && !isDandori && activeJob !== undefined;
-          const isIdle = !isAbnormal && !isNgActive && !isDandori && activeJob === undefined;
+          const hasUncompleted = activeJob !== undefined && activeJob.status !== 'completed';
+          const isRunning = !isAbnormal && !isNgActive && hasUncompleted && activeJob.status === 'running';
+          const isDandori = !isAbnormal && !isNgActive && hasUncompleted && !isRunning;
+          const isIdle = !isAbnormal && !isNgActive && !hasUncompleted;
 
           const isAbnormalLong =
             isAbnormal &&

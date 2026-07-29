@@ -9,6 +9,7 @@ interface ThemeState {
   systemLogo: string;
   browserTitle: string;
   machineTypes: string;
+  abnormalityTypes: string;
   isLoading: boolean;
   darkMode: boolean;
   toggleDarkMode: () => void;
@@ -21,6 +22,7 @@ interface ThemeState {
     system_logo?: string;
     browser_title?: string;
     machine_types?: string;
+    abnormality_types?: string;
   }) => Promise<void>;
 }
 
@@ -57,6 +59,9 @@ const applyThemeToDOM = (primary: string, secondary: string, navbar: string, bro
   }
 };
 
+const DEFAULT_ABNORMALITY_TYPES =
+  'Mesin Breakdown (Mekanik),Tunggu Bahan Baku,Tunggu Crane / Mold Swap,Listrik Padam,Masalah Kualitas (Investigasi),Trial Mold / Part Baru,Lainnya';
+
 // Manage website theme settings and apply brand colors to CSS variables
 export const useThemeStore = create<ThemeState>((set) => ({
   colorPrimary: '#008d51',
@@ -66,6 +71,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   systemLogo: '/logo.png',
   browserTitle: 'SC Prod Plan',
   machineTypes: 'injection,painting',
+  abnormalityTypes: DEFAULT_ABNORMALITY_TYPES,
   isLoading: false,
   darkMode: localStorage.getItem('sugity_dark_mode') === 'true',
 
@@ -99,6 +105,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const logo = data.system_logo || '/logo.png';
       const bTitle = data.browser_title || 'SC Prod Plan';
       const mTypes = data.machine_types || 'injection,painting';
+      const abnTypes = data.abnormality_types || DEFAULT_ABNORMALITY_TYPES;
       
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -109,6 +116,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
         systemLogo: logo,
         browserTitle: bTitle,
         machineTypes: mTypes,
+        abnormalityTypes: abnTypes,
       });
     } catch (err) {
       console.error('Failed to load site config theme:', err);
@@ -130,6 +138,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const logo = data.system_logo || '/logo.png';
       const bTitle = data.browser_title || 'SC Prod Plan';
       const mTypes = data.machine_types || 'injection,painting';
+      const abnTypes = data.abnormality_types || DEFAULT_ABNORMALITY_TYPES;
 
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -140,6 +149,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
         systemLogo: logo,
         browserTitle: bTitle,
         machineTypes: mTypes,
+        abnormalityTypes: abnTypes,
       });
     } catch (err) {
       console.error('Failed to update theme config:', err);
