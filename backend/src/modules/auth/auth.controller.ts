@@ -6,7 +6,7 @@ import { env } from '../../config/env';
 const cookieOpts = {
   httpOnly: true,
   secure: env.isProd,
-  sameSite: 'lax' as const,
+  sameSite: env.isProd ? ('none' as const) : ('lax' as const),
   maxAge: env.cookieMaxAge * 1000, // ms
 };
 
@@ -35,7 +35,7 @@ export const authController = {
 
   // POST /api/auth/logout
   logout: (_req: Request, res: Response) => {
-    res.clearCookie(env.cookieName).json({ status: 'ok', message: 'Logout berhasil.' });
+    res.clearCookie(env.cookieName, cookieOpts).json({ status: 'ok', message: 'Logout berhasil.' });
   },
 
   // GET /api/auth/me

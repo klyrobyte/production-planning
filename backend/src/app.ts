@@ -25,6 +25,9 @@ import { qrWebhookRouter, startQrWebhookPoller } from './modules/machines/qr-web
 export const createApp = () => {
   const app = express();
 
+  // Trust proxy for secure cookies behind Railway/Vercel reverse proxies
+  app.set('trust proxy', 1);
+
   // Jalankan background poller QR Webhook IoT
   startQrWebhookPoller(1000);
 
