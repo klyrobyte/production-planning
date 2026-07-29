@@ -26,7 +26,6 @@ RUN npm ci --only=production
 
 # Copy compiled JavaScript output
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/database/migrations ./dist/database/migrations
 
 # Railway akan menyediakan PORT dinamis via process.env.PORT
 EXPOSE 3000
