@@ -35,7 +35,7 @@ export const handleCreate = async (req: Request, res: Response) => {
 };
 
 export const handleUpdate = async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
   const { name, service_uuid, notes } = req.body;
   if (!name || !service_uuid) {
     res.status(400).json({ error: 'name and service_uuid are required.' });
@@ -50,7 +50,7 @@ export const handleUpdate = async (req: Request, res: Response) => {
 };
 
 export const handleDelete = async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string, 10);
   try {
     const result = await btPrintersService.delete(id);
     res.json(result);
