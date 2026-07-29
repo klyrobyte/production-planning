@@ -333,9 +333,16 @@ export function PrintLabelModal({
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
+      const isBypassMode =
+        typeof window !== 'undefined' &&
+        localStorage.getItem('sugity_dev_bypass_bt') === 'true';
+
       if (connectionStatus === 'connected' && btCharacteristic) {
         const data = generateEscPosData();
         await sendBluetoothData(data);
+      } else if (isBypassMode) {
+        // Dev Bypass Mode: Suppress browser print / Save-as-PDF prompt completely
+        console.log('[DEV BYPASS MODE] Suppressing browser print / Save-as-PDF prompt.');
       } else {
         await handleBrowserPrint();
       }
@@ -472,6 +479,11 @@ export function PrintLabelModal({
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+              {typeof window !== 'undefined' && localStorage.getItem('sugity_dev_bypass_bt') === 'true' && (
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm">
+                  ⚡ Dev Bypass Mode: Prompt Cetak Di-Bypass (Pcs Langsung Bertambah)
                 </div>
               )}
             </div>

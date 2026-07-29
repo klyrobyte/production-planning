@@ -374,21 +374,21 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300 ${
                       isDragOverConversions
                         ? 'border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-750 bg-slate-50/50 dark:bg-slate-955/20'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20'
                     }`}
                   >
                     {isUploadingConversions ? (
                       <div className="text-center space-y-2">
                         <RefreshCw className="w-8 h-8 text-[#E76114] animate-spin mx-auto" />
-                        <p className="text-xs font-bold text-slate-755 dark:text-white">Memproses berkas...</p>
+                        <p className="text-xs font-bold text-slate-500 dark:text-white">Memproses berkas...</p>
                       </div>
                     ) : (
                       <>
-                        <div className="p-3 bg-white dark:bg-slate-955 rounded-full shadow-sm">
+                        <div className="p-3 bg-white dark:bg-slate-950 rounded-full shadow-sm">
                           <Upload className="w-5 h-5 text-[#E76114]" />
                         </div>
                         <div className="text-center">
-                          <p className="text-xs font-bold text-slate-750 dark:text-white">Tarik & lepas berkas CSV di sini</p>
+                          <p className="text-xs font-bold text-slate-500 dark:text-white">Tarik & lepas berkas CSV di sini</p>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">atau klik untuk menelusuri folder Anda</p>
                         </div>
                       </>
@@ -420,7 +420,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                       </div>
 
                       <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
-                        <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 text-[9px] font-black uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 text-slate-450">
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 text-[9px] font-black uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 text-slate-400">
                           Pratinjau Data (Maks. 5 Data Pertama)
                         </div>
                         <div className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[9px]">
@@ -434,8 +434,8 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                                 <div className="font-extrabold text-[#E76114]">{row.prod_sebango}</div>
                                 <div className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase mt-1 ${
                                   row.part_category === 'small' 
-                                    ? 'bg-blue-50 text-blue-605 dark:bg-blue-950/40 dark:text-blue-400' 
-                                    : 'bg-emerald-50 text-emerald-605 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' 
+                                    : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
                                 }`}>
                                   {row.part_category}
                                 </div>
@@ -462,7 +462,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                       value={manualFormConversions.cust_part_number}
                       onChange={(e) => setManualFormConversions(prev => ({ ...prev, cust_part_number: e.target.value }))}
                       placeholder="e.g. 52119-0K920"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
                     />
                   </div>
 
@@ -475,7 +475,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                       value={manualFormConversions.cust_sebango}
                       onChange={(e) => setManualFormConversions(prev => ({ ...prev, cust_sebango: e.target.value }))}
                       placeholder="e.g. F41-2"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
                     />
                   </div>
 
@@ -489,7 +489,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                       value={manualFormConversions.prod_sebango}
                       onChange={(e) => setManualFormConversions(prev => ({ ...prev, prod_sebango: e.target.value }))}
                       placeholder="e.g. E43-1"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
                     />
                   </div>
 
@@ -533,7 +533,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                 value={searchTermConversions}
                 onChange={(e) => setSearchTermConversions(e.target.value)}
                 placeholder="Cari part number, sebango..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
               />
             </div>
 
@@ -563,7 +563,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-705 dark:text-white">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-700 dark:text-white">
                   {isLoading ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
@@ -605,7 +605,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                             <button
                               type="button"
                               onClick={() => handleOpenEditModalConversions(row)}
-                              className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-705 dark:hover:text-white transition-colors cursor-pointer"
+                              className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
                               title="Edit Mapping"
                             >
                               <Edit2 className="h-4 w-4" />
@@ -638,7 +638,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     type="button"
                     disabled={currentPageConversions === 1}
                     onClick={() => setCurrentPageConversions(prev => Math.max(1, prev - 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -646,7 +646,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     type="button"
                     disabled={currentPageConversions === totalPagesConversions}
                     onClick={() => setCurrentPageConversions(prev => Math.min(totalPagesConversions, prev + 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -697,7 +697,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     type="text"
                     value={editFormConversions.cust_sebango}
                     onChange={(e) => setEditFormConversions(prev => ({ ...prev, cust_sebango: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2.5 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
                   />
                 </div>
 
@@ -708,7 +708,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                     required
                     value={editFormConversions.prod_sebango}
                     onChange={(e) => setEditFormConversions(prev => ({ ...prev, prod_sebango: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-mono"
                   />
                 </div>
 
@@ -730,7 +730,7 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
                 <button
                   type="button"
                   onClick={() => setSelectedConversionForEdit(null)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-605 font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer dark:text-white"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer dark:text-white"
                 >
                   Batal
                 </button>

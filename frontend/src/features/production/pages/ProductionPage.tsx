@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../../shared/store/useAuthStore';
 import { useProduction } from '../context/ProductionContext';
@@ -14,15 +14,23 @@ export default function ProductionPage() {
 
   const activePortal = useAuthStore((state) => state.activePortal);
   const activeMachineCode = useAuthStore((state) => state.activeMachineCode);
+  const isOperatorAuthenticated = useAuthStore((state) => state.isOperatorAuthenticated);
   const logoutOperator = useAuthStore((state) => state.logoutOperator);
 
   if (activePortal === 'member') {
+    if (!isOperatorAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
     if (!urlMachine || urlMachine !== activeMachineCode) {
       return <Navigate to="/forbidden" replace />;
     }
   }
 
-  const { activeTab, selectedDate, machinesData, allMachinesList } = useProduction();
+  const { activeTab, selectedDate, machinesData, allMachinesList, fetchPlans } = useProduction();
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
   const handleNavigateMachine = (direction: 'next' | 'prev') => {
     if (!urlMachine) return;

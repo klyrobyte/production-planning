@@ -331,11 +331,25 @@ function ShiftTimeline({
       ? currentTimeStr || new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
       : undefined;
 
+    const isValidShiftTime = (timeStr?: string, jobShift?: string) => {
+      if (!timeStr || !timeStr.includes(':')) return false;
+      const [hStr, mStr] = timeStr.split(':');
+      const mins = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+      if (jobShift === 'day') {
+        return mins >= 420 && mins <= 1140;
+      } else {
+        return mins < 435 || mins >= 1260;
+      }
+    };
+
+    const hasValidActualStart =
+      (job.actualProductionStart && isValidShiftTime(job.actualProductionStart, job.shift)) ||
+      (job.actualDandoriStart && isValidShiftTime(job.actualDandoriStart, job.shift));
+
     const isSkipped =
       job.status === 'completed' &&
       (job.actualQty === undefined || job.actualQty === 0) &&
-      !job.actualProductionStart &&
-      !job.actualDandoriStart;
+      !hasValidActualStart;
 
     if (isSkipped) {
       // Do nothing
@@ -567,7 +581,7 @@ function ShiftTimeline({
   return (
     <div className="p-5 bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden mb-6">
       <h4 className="text-lg font-black tracking-widest text-slate-800 uppercase text-center mb-6">
-        {shift === 'day' ? 'Day Shift Workhour (07:00 - 19:00)' : 'Night Shift Workhour (21:00 - 07:15)'}
+        {shift === 'day' ? 'Day Shift Workhour (07:15 - 19:00)' : 'Night Shift Workhour (21:00 - 07:00)'}
       </h4>
 
       <div className="overflow-x-auto w-full pb-2 scrollbar-thin">
@@ -1467,33 +1481,6 @@ export function MachinePatternView({
 
             {canEditPattern ? (
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Day OT:</span>
-                    <select
-                      value={dayOT}
-                      onChange={(e) => applyOvertimeSettings(e.target.value, nightOT)}
-                      className="bg-white border border-slate-250 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none"
-                    >
-                      <option value="teiji">Teiji (No OT)</option>
-                      <option value="1.5h">1.5 Jam OT</option>
-                      <option value="3h">3 Jam OT</option>
-                    </select>
-                  </div>
-                  <div className="w-[1px] h-4 bg-slate-200"></div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Night OT:</span>
-                    <select
-                      value={nightOT}
-                      onChange={(e) => applyOvertimeSettings(dayOT, e.target.value)}
-                      className="bg-white border border-slate-250 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none"
-                    >
-                      <option value="teiji">Teiji (No OT)</option>
-                      <option value="1.5h">1.5 Jam OT</option>
-                      <option value="3h">3 Jam OT</option>
-                    </select>
-                  </div>
-                </div>
 
                 <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-inner gap-1 font-bold text-xs select-none">
                   <button

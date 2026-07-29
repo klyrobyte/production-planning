@@ -1,0 +1,8 @@
+{
+  "label": "Developer Guide",
+  "position": 8,
+  "link": {
+    "type": "generated-index",
+    "description": "Panduan teknis bagi developer untuk memahami struktur codebase, standar kode, dan alur penambahan fitur baru."
+  }
+}

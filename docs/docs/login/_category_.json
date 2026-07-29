@@ -1,0 +1,8 @@
+{
+  "label": "Login",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Dokumentasi mengenai alur login bertingkat untuk perangkat dan member operator."
+  }
+}

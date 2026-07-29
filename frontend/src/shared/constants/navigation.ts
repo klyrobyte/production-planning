@@ -1,9 +1,9 @@
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  Factory, 
-  ScrollText, 
-  Settings, 
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Factory,
+  ScrollText,
+  Settings,
   Database,
   Users,
   Cpu,
@@ -34,7 +34,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     label: 'Production Board',
     path: '/board',
     icon: MonitorPlay,
-    allowedRoles: ['super-admin', 'planner', 'leader', 'production-board'],
+    allowedRoles: ['super-admin', 'production-board'],
   },
   {
     id: 'orders',

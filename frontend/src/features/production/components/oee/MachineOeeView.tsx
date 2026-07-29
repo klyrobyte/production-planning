@@ -319,7 +319,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
             <Award className="w-4 h-4 text-indigo-500" /> OEE Weekly Historical Trend (7 Days)
@@ -405,7 +405,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
             <Printer className="w-4 h-4 text-purple-500" /> Printer Telemetry & Status
           </h3>
@@ -432,7 +432,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                 <button
                   onClick={handleReconnect}
                   disabled={isConnecting}
-                  className="px-2.5 py-1 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 rounded-lg text-[9px] font-extrabold uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                  className="px-2.5 py-1 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[9px] font-extrabold uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
                 >
                   <RefreshCw className={`w-2.5 h-2.5 ${isConnecting ? 'animate-spin' : ''}`} />{' '}
                   {isConnecting ? 'Reconnecting...' : 'Reconnect'}
@@ -467,7 +467,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
                 className={`flex-1 py-2 font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-colors border cursor-pointer ${
                   isJamSimulated
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
-                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-250 dark:bg-rose-950/20 dark:text-rose-455'
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-250 dark:bg-rose-950/20 dark:text-rose-400'
                 }`}
               >
                 {isJamSimulated ? 'Fix Paper Jam' : 'Simulate Jam'}
@@ -476,7 +476,7 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm flex flex-col">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4 shrink-0">
             <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
               <Cpu className="w-4 h-4 text-blue-500" /> Active Print Queue
@@ -521,11 +521,11 @@ export function MachineOeeView({ machine, factory, machineKey: propsMachineKey, 
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
             <ShieldAlert className="w-4 h-4 text-amber-500" /> Troubleshooter
           </h3>
-          <div className="space-y-3 text-[11px] leading-relaxed pt-2 text-slate-650 dark:text-slate-400">
+          <div className="space-y-3 text-[11px] leading-relaxed pt-2 text-slate-500 dark:text-slate-400">
             <div className="flex gap-2">
               <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-600 dark:text-slate-400 font-black shrink-0">
                 1

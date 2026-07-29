@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Play,
@@ -17,14 +17,40 @@ import {
   Minimize,
   Sun,
   Moon,
+  QrCode,
 } from 'lucide-react';
 import { useProduction, getUniqueMachineKey, getTodayDateString } from '../../context/ProductionContext';
 import type { Job } from '../../context/ProductionContext';
 import { PrintLabelModal } from '../modals/PrintLabelModal';
 import api from '../../../../shared/lib/axios';
+import { initSocket } from '../../../../shared/lib/socket';
 import { useAuthStore } from '../../../../shared/store/useAuthStore';
+import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import { useScreenControls } from '../../../../shared/hooks/useScreenControls';
 import { useBtPrinterStore } from '../../../../shared/store/useBtPrinterStore';
+import { useToastStore } from '../../../../shared/store/useToastStore';
+
+function playScanSuccessBeep() {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, now);
+    osc.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+}
 
 function playLoudKanbanBeep() {
   try {
@@ -66,7 +92,7 @@ interface MachineExecutionViewProps {
   selectedDate: string;
 }
 
-const ABNORMAL_TYPES = [
+const DEFAULT_ABNORMAL_TYPES = [
   'Mesin Breakdown (Mekanik)',
   'Tunggu Bahan Baku',
   'Tunggu Crane / Mold Swap',
@@ -115,8 +141,6 @@ export function MachineExecutionView({
     activeAbnormalities,
     activeNgs,
     logs,
-    dayOTs,
-    nightOTs,
     updateJobStatus,
     setMachineAbnormal,
     setMachineNg,
@@ -145,7 +169,7 @@ export function MachineExecutionView({
     ? getInitials(memberName)
     : activePortal === 'member'
     ? 'MB'
-    : activePortal.substring(0, 2).toUpperCase();
+    : (activePortal || 'SYS').substring(0, 2).toUpperCase();
   const mName = machine || `MC ${machineKey}`;
 
   const getLogNote = (baseNote: string) => {
@@ -162,12 +186,17 @@ export function MachineExecutionView({
     localStorage.setItem('sugity_dev_bypass_bt', String(newVal));
   };
 
+  const abnormalityTypes = useThemeStore((state) => state.abnormalityTypes);
+  const abnormalTypeList = useMemo(() => {
+    if (!abnormalityTypes) return DEFAULT_ABNORMAL_TYPES;
+    const items = abnormalityTypes.split(',').map((s) => s.trim()).filter(Boolean);
+    return items.length > 0 ? items : DEFAULT_ABNORMAL_TYPES;
+  }, [abnormalityTypes]);
+
   const jobs = machineJobs[planKey] || [];
   const abnormality = activeAbnormalities[planKey] ?? { isAbnormal: false, type: '', start: '' };
   const ngState = activeNgs[planKey] ?? { isNg: false, type: '', start: '' };
   const logList = logs[planKey] || [];
-  const dayOT = dayOTs[planKey] || 'teiji';
-  const nightOT = nightOTs[planKey] || 'teiji';
 
   const { data: partsData = [] } = useQuery<any[]>({
     queryKey: ['parts'],
@@ -186,7 +215,7 @@ export function MachineExecutionView({
   const [leaderPin, setLeaderPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
-  const [selectedAbnType, setSelectedAbnType] = useState(ABNORMAL_TYPES[0]);
+  const [selectedAbnType, setSelectedAbnType] = useState(DEFAULT_ABNORMAL_TYPES[0]);
   const [selectedNgType, setSelectedNgType] = useState(NG_TYPES[0]);
   const [abnormalStartTime, setAbnormalStartTime] = useState('');
   const [ngStartTime, setNgStartTime] = useState('');
@@ -292,6 +321,152 @@ export function MachineExecutionView({
     () => jobs.find((j) => j.status === 'running' || j.status === 'dandori') ?? null,
     [jobs]
   );
+
+  const [manualQrInput, setManualQrInput] = useState('');
+  const qrBufferRef = useRef<string>('');
+  const lastKeyTimeRef = useRef<number>(0);
+
+  const processQrCode = (code: string, isFromBroadcast: boolean = false) => {
+    const trimmed = code.trim();
+    const validCodes = ['AiG2cCqE', 'Fqe29Qra'];
+    if (!validCodes.includes(trimmed)) {
+      return false;
+    }
+
+    if (!isFromBroadcast) {
+      try {
+        const bc = new BroadcastChannel('sugity_qr_scan_sync');
+        bc.postMessage({ code: trimmed, timestamp: Date.now() });
+        bc.close();
+      } catch (e) {
+        console.warn('BroadcastChannel error:', e);
+      }
+    }
+
+    if (isReadOnlyMode) {
+      useToastStore.getState().showToast('Mode Read-Only: Tidak dapat memproses scan QR pada tanggal lalu.', 'error');
+      return true;
+    }
+
+    if (!activeJob) {
+      useToastStore.getState().showToast('Tidak ada Job Aktif pada mesin ini untuk mencetak label.', 'warning');
+      return true;
+    }
+
+    if (activeJob.status !== 'running') {
+      useToastStore.getState().showToast(
+        `Job ${activeJob.model} masih dalam tahap Dandori / Persiapan. Selesaikan Dandori terlebih dahulu sebelum mencetak label!`,
+        'warning'
+      );
+      return true;
+    }
+
+    const printQty = activeJob.spec ?? 24;
+    playScanSuccessBeep();
+    incrementJobProgress(machineKey, activeJob.id, printQty, selectedDate, partsData, {
+      type: 'progress',
+      note: getLogNote(`Print label ${activeJob.model}: +${printQty} pcs`),
+    });
+
+    useToastStore.getState().showToast(`[QR SCAN SUCCESS] Print label ${activeJob.model}: +${printQty} pcs`, 'success');
+    return true;
+  };
+
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('sugity_qr_scan_sync');
+      bc.onmessage = (event) => {
+        if (event.data?.code) {
+          processQrCode(event.data.code, true);
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel init error:', e);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const targetEl = e.target as HTMLElement;
+      const isInputElement =
+        targetEl &&
+        (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA' || targetEl.tagName === 'SELECT');
+
+      if (e.key === 'Enter') {
+        const scannedStr = qrBufferRef.current.trim();
+        qrBufferRef.current = '';
+        if (scannedStr) {
+          const handled = processQrCode(scannedStr);
+          if (handled && !isInputElement) {
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const now = Date.now();
+        if (now - lastKeyTimeRef.current > 500 && !isInputElement) {
+          qrBufferRef.current = '';
+        }
+        lastKeyTimeRef.current = now;
+        qrBufferRef.current += e.key;
+
+        const currentBuf = qrBufferRef.current;
+        for (const targetCode of ['AiG2cCqE', 'Fqe29Qra']) {
+          if (currentBuf.endsWith(targetCode)) {
+            qrBufferRef.current = '';
+            processQrCode(targetCode);
+            if (!isInputElement) e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeJob, machineKey, selectedDate, partsData, isReadOnlyMode, userInitials]);
+
+  useEffect(() => {
+    const socket = initSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleQrScannedSocket = (data: any) => {
+      console.log('[Socket QR Scan Event Received]', data);
+      const currentKey = (machineKey || '').toLowerCase();
+      const jobModel = (activeJob?.model || '').toLowerCase();
+      const jobPartNumber = ((activeJob as any)?.partNumber || activeJob?.partName || '').toLowerCase();
+
+      const incomingPartNumber = (data?.partNumber || '').toLowerCase();
+      const incomingModel = (data?.model || '').toLowerCase();
+      const incomingHomeLine = (data?.homeLine || '').toLowerCase();
+      const incomingMachineCode = (data?.machineCode || '').toLowerCase();
+
+      const isMatch =
+        (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
+        (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
+        (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
+        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey)));
+
+      if (isMatch || !incomingPartNumber) {
+        useToastStore.getState().showToast(
+          `[IoT WEBHOOK SCAN] Event diterima dari endpoint IoT (${data?.partNumber || data?.model || 'QR-1008'})`,
+          'info'
+        );
+        processQrCode('AiG2cCqE');
+      }
+    };
+
+    socket.on('qr_scanned', handleQrScannedSocket);
+    return () => {
+      socket.off('qr_scanned', handleQrScannedSocket);
+    };
+  }, [machineKey, activeJob, processQrCode]);
 
   const isFirstInShift = useMemo(() => {
     if (!jobs || jobs.length === 0 || !activeJob) return false;
@@ -467,63 +642,7 @@ export function MachineExecutionView({
     });
   };
 
-  useEffect(() => {
-    if (isReadOnlyMode) return;
-    const todayDate = getTodayDateString();
-    if (selectedDate !== todayDate) return;
 
-    const dayJobs = jobs.filter((j) => j.shift === 'day');
-    const nightJobs = jobs.filter((j) => j.shift === 'night');
-
-    if (dayJobs.length > 0) {
-      const dayEndStr = dayOT === 'ot' ? '21:00' : '16:30';
-      const [h, m] = dayEndStr.split(':').map((n) => parseInt(n, 10));
-      const dayEndClock = new Date(selectedDate + 'T00:00:00');
-      dayEndClock.setHours(h, m, 0, 0);
-
-      const isDayShiftPending = dayJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
-      if (currentLiveTime.getTime() >= dayEndClock.getTime() && isDayShiftPending) {
-        if (abnormality.isAbnormal) {
-          setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
-          });
-        }
-        if (ngState.isNg) {
-          setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift DAY berakhir. (${userInitials})`,
-          });
-        }
-        closeShiftProduction(machineKey, 'day', selectedDate, userInitials, mName, true);
-      }
-    }
-
-    if (nightJobs.length > 0) {
-      const nightEndStr = nightOT === 'ot' ? '07:15' : '05:00';
-      const [h, m] = nightEndStr.split(':').map((n) => parseInt(n, 10));
-      const nightEndClock = new Date(selectedDate + 'T00:00:00');
-      nightEndClock.setDate(nightEndClock.getDate() + 1);
-      nightEndClock.setHours(h, m, 0, 0);
-
-      const isNightShiftPending = nightJobs.some((j) => j.status !== 'completed' || !j.finalDandoriCompleted);
-      if (currentLiveTime.getTime() >= nightEndClock.getTime() && isNightShiftPending) {
-        if (abnormality.isAbnormal) {
-          setMachineAbnormal(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Abnormality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
-          });
-        }
-        if (ngState.isNg) {
-          setMachineNg(machineKey, false, undefined, undefined, selectedDate, {
-            type: 'success',
-            note: `[AUTO-RESOLVE] Issue NG Quality di-resolve otomatis karena shift NIGHT berakhir. (${userInitials})`,
-          });
-        }
-        closeShiftProduction(machineKey, 'night', selectedDate, userInitials, mName, true);
-      }
-    }
-  }, [currentLiveTime, jobs, selectedDate, machineKey, mName, abnormality.isAbnormal, ngState.isNg, dayOT, nightOT, userInitials, isReadOnlyMode, closeShiftProduction, setMachineAbnormal, setMachineNg]);
 
   const handleOpenSignOff = (job: Job) => {
     setSignOffJobId(job.id);
@@ -676,36 +795,72 @@ export function MachineExecutionView({
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-900 p-4 sm:p-6 space-y-5">
-      {/* Fullscreen & Always Awake Toolbar */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={toggleWakeLock}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-            isWakeLockActive
-              ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
-          }`}
-          title={
-            isWakeLockActive
-              ? 'Screen stay-awake aktif — klik untuk nonaktifkan'
-              : 'Aktifkan screen stay-awake agar tablet tidak mati otomatis'
-          }
-        >
-          {isWakeLockActive ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          {isWakeLockActive ? 'Awake On' : 'Stay Awake'}
-        </button>
-        <button
-          onClick={toggleFullscreen}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-            isFullscreen
-              ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
-          }`}
-          title={isFullscreen ? 'Keluar dari fullscreen' : 'Masuk fullscreen mode'}
-        >
-          {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-          {isFullscreen ? 'Exit FS' : 'Fullscreen'}
-        </button>
+      {/* Toolbar: QR Scanner Indicator, Fullscreen & Wake Lock */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl shadow-sm">
+          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+            <QrCode className="w-3.5 h-3.5 animate-pulse" /> QR Scanner Mode: Active
+          </span>
+          <div className="h-3.5 w-px bg-slate-200 dark:bg-slate-800" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualQrInput.trim()) {
+                const handled = processQrCode(manualQrInput.trim());
+                if (!handled) {
+                  useToastStore.getState().showToast(`String '${manualQrInput}' bukan kode QR print yang valid.`, 'warning');
+                }
+                setManualQrInput('');
+              }
+            }}
+            className="flex items-center gap-1.5"
+          >
+            <input
+              type="text"
+              placeholder="Simulasi Scan QR..."
+              value={manualQrInput}
+              onChange={(e) => setManualQrInput(e.target.value)}
+              className="w-28 sm:w-36 px-2 py-0.5 text-[10px] font-mono border border-slate-200 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-emerald-500"
+            />
+            <button
+              type="submit"
+              className="px-2 py-0.5 text-[9px] font-extrabold uppercase bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer transition-colors"
+            >
+              Scan
+            </button>
+          </form>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleWakeLock}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
+              isWakeLockActive
+                ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
+            }`}
+            title={
+              isWakeLockActive
+                ? 'Screen stay-awake aktif — klik untuk nonaktifkan'
+                : 'Aktifkan screen stay-awake agar tablet tidak mati otomatis'
+            }
+          >
+            {isWakeLockActive ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {isWakeLockActive ? 'Awake On' : 'Stay Awake'}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
+              isFullscreen
+                ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
+            }`}
+            title={isFullscreen ? 'Keluar dari fullscreen' : 'Masuk fullscreen mode'}
+          >
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            {isFullscreen ? 'Exit FS' : 'Fullscreen'}
+          </button>
+        </div>
       </div>
 
       {/* Read-Only Warning Banner */}
@@ -1331,7 +1486,7 @@ export function MachineExecutionView({
                         onChange={(e) => setSelectedAbnType(e.target.value)}
                         className="w-full px-2.5 py-1.5 border border-rose-200 dark:border-rose-800 rounded text-xs font-bold bg-white dark:bg-slate-900 text-rose-900 dark:text-rose-400 outline-none focus:border-rose-400"
                       >
-                        {ABNORMAL_TYPES.map((t) => (
+                        {abnormalTypeList.map((t) => (
                           <option key={t} value={t}>
                             {t}
                           </option>

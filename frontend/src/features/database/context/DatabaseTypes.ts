@@ -23,6 +23,7 @@ export interface PartItem {
   factory_name?: string;
   ct_seconds?: number;
   pcs_per_kanban?: number;
+  qr_webhook_url?: string;
   created_at?: string;
   updated_at?: string;
 }

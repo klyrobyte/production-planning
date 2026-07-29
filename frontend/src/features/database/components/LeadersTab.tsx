@@ -179,7 +179,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                     value={manualForm.name}
                     onChange={(e) => setManualForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="e.g. Ahmad Santoso"
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2.5 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
                   />
                 </div>
 
@@ -197,7 +197,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                       setManualForm(prev => ({ ...prev, pin: val }));
                     }}
                     placeholder="e.g. 1234"
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2.5 px-3 text-xs font-bold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 tracking-widest font-mono"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 tracking-widest font-mono"
                   />
                 </div>
 
@@ -230,7 +230,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                   setCurrentPage(1);
                 }}
                 placeholder="Cari nama leader..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
               />
             </div>
           </div>
@@ -247,7 +247,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-705 dark:text-white">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-700 dark:text-white">
                   {isLoading && leaders.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
@@ -266,7 +266,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                   ) : (
                     paginatedLeaders.map((row) => (
                       <tr key={row.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="px-6 py-4 text-left font-bold text-slate-850 dark:text-white">
+                        <td className="px-6 py-4 text-left font-bold text-slate-800 dark:text-white">
                           {row.name}
                         </td>
                         <td className="px-6 py-4 text-left font-mono font-bold">
@@ -275,7 +275,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                               {revealedPins[row.id]}
                             </span>
                           ) : (
-                            <span className="text-slate-350 dark:text-slate-600 tracking-widest">
+                            <span className="text-slate-300 dark:text-slate-600 tracking-widest">
                               ••••
                             </span>
                           )}
@@ -295,7 +295,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                               type="button"
                               onClick={() => handleToggleRevealPin(row.id)}
                               disabled={revealingId === row.id}
-                              className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-705 dark:hover:text-white transition-colors cursor-pointer"
+                              className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
                               title={revealedPins[row.id] ? "Sembunyikan PIN" : "Tampilkan PIN"}
                             >
                               {revealingId === row.id ? (
@@ -309,7 +309,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                             <button
                               type="button"
                               onClick={() => handleDeleteLeader(row.id, row.name)}
-                              className="rounded-lg p-2 text-rose-505 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                              className="rounded-lg p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
                               title="Hapus Leader"
                             >
                               <Trash2 className="h-4 w-4 text-rose-600" />
@@ -334,7 +334,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                     type="button"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -342,7 +342,7 @@ export default function LeadersTab({ refreshTrigger }: LeadersTabProps) {
                     type="button"
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>

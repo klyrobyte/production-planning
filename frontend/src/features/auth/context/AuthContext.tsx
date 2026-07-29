@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [memberError, setMemberError] = useState<string | null>(null);
   const [isMemberLoading, setIsMemberLoading] = useState(false);
 
-  // Fetch Factories on mount
+  // Fetch Factories when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
     let isMounted = true;
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }).catch(() => {});
     return () => { isMounted = false; };
-  }, []);
+  }, [isAuthenticated]);
 
   // Fetch Machines when factory changes
   useEffect(() => {

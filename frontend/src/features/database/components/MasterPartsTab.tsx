@@ -65,7 +65,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     shikake: '2',
     customer_pno: '',
     customer_sebango: '',
-    spec: '6'
+    spec: '6',
+    qr_webhook_url: ''
   });
 
   // Manual Form State
@@ -87,7 +88,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     shikake: '2',
     customer_pno: '',
     customer_sebango: '',
-    spec: '6'
+    spec: '6',
+    qr_webhook_url: ''
   });
 
   // Machines state
@@ -398,7 +400,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       customer_pno: customer_pno.trim(),
       customer_sebango: customer_sebango.trim(),
       spec: parseInt(spec) || 6,
-      process: 'injection'
+      process: 'injection',
+      qr_webhook_url: manualForm.qr_webhook_url?.trim() || undefined
     };
 
     setIsLoading(true);
@@ -423,7 +426,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
         shikake: '2',
         customer_pno: '',
         customer_sebango: '',
-        spec: '6'
+        spec: '6',
+        qr_webhook_url: ''
       });
       fetchParts();
     } catch (err: any) {
@@ -453,7 +457,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       shikake: part.shikake?.toString() || '2',
       customer_pno: part.customer_pno || '',
       customer_sebango: part.customer_sebango || '',
-      spec: part.spec?.toString() || '6'
+      spec: part.spec?.toString() || '6',
+      qr_webhook_url: part.qr_webhook_url || ''
     });
   };
 
@@ -494,7 +499,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       shikake,
       customer_pno,
       customer_sebango,
-      spec
+      spec,
+      qr_webhook_url
     } = editForm;
 
     if (!part_number || !part_name || !model || !customer || !sebango) {
@@ -522,7 +528,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       customer_pno: customer_pno.trim(),
       customer_sebango: customer_sebango.trim(),
       spec: parseInt(spec) || 6,
-      process: 'injection'
+      process: 'injection',
+      qr_webhook_url: qr_webhook_url?.trim() || undefined
     };
 
     setIsLoading(true);
@@ -659,7 +666,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
               {/* CSV Upload Section */}
               {activeTab === 'csv' && (
                 <div className="space-y-5">
-                  <div className="bg-slate-50 dark:bg-slate-955 rounded-xl p-4 border border-slate-200/60 dark:border-slate-800/80 flex items-start gap-3">
+                  <div className="bg-slate-50 dark:bg-slate-950 rounded-xl p-4 border border-slate-200/60 dark:border-slate-800/80 flex items-start gap-3">
                     <FileSpreadsheet className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     <div>
                       <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-white">Format Header Spreadsheet</h4>
@@ -690,17 +697,17 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 shadow-inner'
                         : parsedPreview.length > 0
                         ? 'border-emerald-350 bg-emerald-50/5 dark:bg-emerald-950/5'
-                        : 'border-slate-350 dark:border-slate-750 hover:border-[#E76114] hover:bg-slate-50/50 dark:hover:bg-slate-950/50'
+                        : 'border-slate-300 dark:border-slate-700 hover:border-[#E76114] hover:bg-slate-50/50 dark:hover:bg-slate-955/50'
                     }`}
                   >
                     {isUploading ? (
                       <div className="space-y-3">
                         <RefreshCw className="w-10 h-10 text-slate-400 animate-spin mx-auto" />
-                        <p className="text-xs font-bold text-slate-650 dark:text-white">Menganalisis konten file...</p>
+                        <p className="text-xs font-bold text-slate-500 dark:text-white">Menganalisis konten file...</p>
                       </div>
                     ) : parsedPreview.length > 0 ? (
                       <div className="space-y-3">
-                        <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-450 flex items-center justify-center mx-auto animate-bounce">
+                        <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto animate-bounce">
                           <CheckCircle className="w-6 h-6" />
                         </div>
                         <h4 className="text-xs font-extrabold text-slate-800 dark:text-white">CSV Siap Diunggah</h4>
@@ -722,7 +729,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                   </div>
 
                   {csvError && (
-                    <div className="bg-rose-50 dark:bg-rose-955/20 border border-rose-250 rounded-xl p-3.5 text-rose-800 dark:text-rose-455 text-[11px] font-medium flex items-center gap-2.5">
+                    <div className="bg-rose-50 dark:bg-rose-955/20 border border-rose-250 rounded-xl p-3.5 text-rose-800 dark:text-rose-400 text-[11px] font-medium flex items-center gap-2.5">
                       <AlertTriangle className="w-4.5 h-4.5 text-rose-600 shrink-0" />
                       <span>{csvError}</span>
                     </div>
@@ -746,10 +753,10 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                               <span className="text-slate-500 dark:text-slate-400 font-medium max-w-[200px] truncate">{part.part_name}</span>
                             </div>
                             <div className="text-right">
-                              <span className="font-extrabold text-emerald-600 dark:text-emerald-450 bg-emerald-50 dark:bg-emerald-955/30 border border-emerald-200/50 dark:border-emerald-900/50 px-2 py-0.5 rounded text-[9px] uppercase tracking-wider">
+                              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/30 border border-emerald-200/50 dark:border-emerald-900/50 px-2 py-0.5 rounded text-[9px] uppercase tracking-wider">
                                 {part.home_line || 'UNASSIGNED'}
                               </span>
-                              <div className="text-slate-450 dark:text-slate-500 text-[8px] mt-0.5 font-bold uppercase tracking-wider font-mono">
+                              <div className="text-slate-400 dark:text-slate-500 text-[8px] mt-0.5 font-bold uppercase tracking-wider font-mono">
                                 Cavity: {part.cavity} | Shikake: {part.shikake}x | {part.weight}kg
                               </div>
                             </div>
@@ -817,7 +824,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                       value={manualForm.part_name}
                       onChange={handleManualInput}
                       placeholder="e.g., BUMPER REAR"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
                     />
                   </div>
 
@@ -928,7 +935,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         value={manualForm.area}
                         readOnly
                         placeholder="Pilih Home Line"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-550 dark:text-slate-400 outline-none cursor-not-allowed text-center"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 outline-none cursor-not-allowed text-center"
                       />
                     </div>
 
@@ -940,7 +947,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         value={manualForm.tonnage}
                         readOnly
                         placeholder="Pilih Home Line"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-550 dark:text-slate-400 outline-none cursor-not-allowed text-center font-bold"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 outline-none cursor-not-allowed text-center font-bold"
                       />
                     </div>
                   </div>
@@ -955,7 +962,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         value={manualForm.cycle_time}
                         onChange={handleManualInput}
                         placeholder="60"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-bold font-mono"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-bold font-mono"
                       />
                     </div>
 
@@ -993,7 +1000,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         value={manualForm.mold}
                         onChange={handleManualInput}
                         placeholder="e.g. M-101"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-955 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-bold"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900 font-bold"
                       />
                     </div>
 
@@ -1034,6 +1041,21 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     />
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
+                      <span>IoT Webhook URL (QR Listener)</span>
+                      <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="qr_webhook_url"
+                      value={manualForm.qr_webhook_url || ''}
+                      onChange={handleManualInput}
+                      placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                    />
+                  </div>
+
                   <button
                     type="submit"
                     style={{ backgroundColor: colorPrimary }}
@@ -1060,7 +1082,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 placeholder="Cari part number, nama, model..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary focus:bg-white dark:focus:bg-slate-900"
               />
             </div>
 
@@ -1098,13 +1120,14 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     <th className="px-6 py-4">Part Info</th>
                     <th className="px-6 py-4">Routing Line</th>
                     <th className="px-6 py-4">Spec</th>
+                    <th className="px-6 py-4">IoT Webhook URL</th>
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-700 dark:text-white">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                         <div className="flex items-center justify-center gap-2">
                           <RefreshCw className="h-4 w-4 animate-spin text-[#E76114]" />
                           <span>Memproses data master parts...</span>
@@ -1113,7 +1136,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     </tr>
                   ) : filteredParts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                         Tidak ada part ditemukan di database.
                       </td>
                     </tr>
@@ -1125,9 +1148,9 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                           <div className="text-[10px] text-slate-500 dark:text-slate-400 max-w-[280px] truncate">{part.part_name}</div>
                           <div className="flex gap-2 mt-1.5 font-bold uppercase tracking-wider text-[8.5px]">
                             <span className="text-[#E76114]">{part.customer}</span>
-                            <span className="text-slate-350 dark:text-slate-655">•</span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
                             <span className="text-slate-500 dark:text-slate-400">{part.model}</span>
-                            <span className="text-slate-350 dark:text-slate-655">•</span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
                             <span className="text-slate-400 dark:text-slate-500 font-mono">Sebango: {part.sebango || '-'}</span>
                           </div>
                         </td>
@@ -1140,6 +1163,15 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         <td className="px-6 py-4 text-left">
                           <div className="font-bold text-slate-700 dark:text-slate-300">CT: {part.cycle_time}s</div>
                           <div className="text-[9px] text-slate-400 dark:text-slate-400 mt-0.5 font-mono">Cavity: {part.cavity} | Shikake: {part.shikake}x</div>
+                        </td>
+                        <td className="px-6 py-4 text-left max-w-xs truncate font-mono text-[10px]">
+                          {part.qr_webhook_url ? (
+                            <span className="bg-slate-100 dark:bg-slate-950 px-2 py-1 rounded border border-slate-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400" title={part.qr_webhook_url}>
+                              {part.qr_webhook_url}
+                            </span>
+                          ) : (
+                            <span className="italic text-slate-400 dark:text-slate-600 text-[9px]">- Belum diatur -</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-1">
@@ -1180,7 +1212,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     type="button"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -1188,7 +1220,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     type="button"
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-855 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -1201,7 +1233,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
 
       {/* Revision Modal Dialog */}
       {selectedPartForEdit && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-955/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col my-8 animate-in zoom-in-95 duration-200 max-h-[90vh]">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-[#E76114] text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2.5">
@@ -1311,10 +1343,26 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     />
                   </div>
                 </div>
+
+                {/* IoT Webhook URL */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
+                    <span>IoT Webhook URL (QR Listener)</span>
+                    <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="qr_webhook_url"
+                    value={editForm.qr_webhook_url || ''}
+                    onChange={handleEditInput}
+                    placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                  />
+                </div>
               </div>
 
               {/* Machine Routing Group */}
-              <div className="space-y-3 bg-slate-50 dark:bg-slate-955 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
                 <div className="text-[10px] font-extrabold text-[#E76114] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 dark:border-slate-800/50 pb-1.5 mb-1">
                   <Layers className="w-3.5 h-3.5" />
                   Routing Mesin
@@ -1381,7 +1429,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
               </div>
 
               {/* Mold Parameters Group */}
-              <div className="space-y-3 bg-slate-50 dark:bg-slate-955 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
                 <div className="text-[10px] font-extrabold text-blue-650 dark:text-blue-455 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 dark:border-slate-800/50 pb-1.5 mb-1">
                   <Cpu className="w-3.5 h-3.5" />
                   Cetakan & Parameter Proses
@@ -1427,7 +1475,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                       name="mold"
                       value={editForm.mold}
                       onChange={handleEditInput}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary font-bold"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary font-bold"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1459,7 +1507,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     name="material"
                     value={editForm.material}
                     onChange={handleEditInput}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-705 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
                   />
                 </div>
               </div>
@@ -1469,7 +1517,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                 <button
                   type="button"
                   onClick={() => setSelectedPartForEdit(null)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-605 font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer dark:text-white"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 font-extrabold text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer dark:text-white"
                 >
                   Batal
                 </button>

@@ -18,6 +18,8 @@ export default function SiteConfigThemeForm() {
     setBrowserTitleInput,
     machineTypesInput,
     setMachineTypesInput,
+    abnormalityTypesInput,
+    setAbnormalityTypesInput,
     isSaving,
     isDragging,
     successMsg,
@@ -83,6 +85,21 @@ export default function SiteConfigThemeForm() {
               onChange={(e) => setMachineTypesInput(e.target.value)}
               placeholder="Contoh: injection,painting,assembly"
               className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900 font-mono"
+            />
+          </div>
+
+          {/* Opsi Jenis Abnormality */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-55 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/40 p-4 text-left">
+            <div className="space-y-0.5">
+              <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">Opsi Jenis Abnormality</h4>
+              <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Pilihan jenis abnormality pada form Report Abnormality di FUKA/Execution (pisahkan dengan koma)</p>
+            </div>
+            <input
+              type="text"
+              value={abnormalityTypesInput}
+              onChange={(e) => setAbnormalityTypesInput(e.target.value)}
+              placeholder="Contoh: Mesin Breakdown (Mekanik),Tunggu Bahan Baku,Tunggu Crane / Mold Swap,Listrik Padam"
+              className="mt-1.5 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-2 px-3 text-xs font-bold text-slate-655 dark:text-slate-200 outline-none focus:border-brand-primary dark:focus:bg-slate-900 font-mono text-[11px]"
             />
           </div>
 

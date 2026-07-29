@@ -19,4 +19,5 @@ export interface UpdateThemePayload {
   system_logo?: string;
   browser_title?: string;
   machine_types?: string;
+  abnormality_types?: string;
 }

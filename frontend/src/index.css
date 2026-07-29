@@ -65,6 +65,15 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
 
+/* Hide scrollbars for specific containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 /* === ABNORMAL MACHINE WAVE EFFECT === */
 @keyframes abnormal-wave {
   0% {

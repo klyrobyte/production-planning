@@ -1,0 +1,8 @@
+{
+  "label": "Eksekusi Produksi",
+  "position": 5,
+  "link": {
+    "type": "generated-index",
+    "description": "Dokumentasi fungsionalitas dan alur pengerjaan pada stasiun mesin oleh member operator."
+  }
+}
