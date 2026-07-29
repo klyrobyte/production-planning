@@ -1,7 +1,17 @@
 import { pool } from '../../config/database';
 
+let isCleanedUp = false;
+async function cleanupMachineSchema() {
+  if (isCleanedUp) return;
+  try {
+    await pool.query('ALTER TABLE machines DROP COLUMN IF EXISTS qr_webhook_url;');
+    isCleanedUp = true;
+  } catch (e) {}
+}
+
 export const machinesRepository = {
   findAll: async (factoryId?: string) => {
+    await cleanupMachineSchema();
     const base = `
       SELECT m.id, m.factory_id, f.code AS factory_code, f.name AS factory_name,
              m.code, m.name, m.type, m.tonnage, m.status, m.created_at

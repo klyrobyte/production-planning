@@ -23,6 +23,7 @@ import { useProduction, getUniqueMachineKey, getTodayDateString } from '../../co
 import type { Job } from '../../context/ProductionContext';
 import { PrintLabelModal } from '../modals/PrintLabelModal';
 import api from '../../../../shared/lib/axios';
+import { initSocket } from '../../../../shared/lib/socket';
 import { useAuthStore } from '../../../../shared/store/useAuthStore';
 import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import { useScreenControls } from '../../../../shared/hooks/useScreenControls';
@@ -428,6 +429,44 @@ export function MachineExecutionView({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [activeJob, machineKey, selectedDate, partsData, isReadOnlyMode, userInitials]);
+
+  useEffect(() => {
+    const socket = initSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleQrScannedSocket = (data: any) => {
+      console.log('[Socket QR Scan Event Received]', data);
+      const currentKey = (machineKey || '').toLowerCase();
+      const jobModel = (activeJob?.model || '').toLowerCase();
+      const jobPartNumber = ((activeJob as any)?.partNumber || activeJob?.partName || '').toLowerCase();
+
+      const incomingPartNumber = (data?.partNumber || '').toLowerCase();
+      const incomingModel = (data?.model || '').toLowerCase();
+      const incomingHomeLine = (data?.homeLine || '').toLowerCase();
+      const incomingMachineCode = (data?.machineCode || '').toLowerCase();
+
+      const isMatch =
+        (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
+        (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
+        (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
+        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey)));
+
+      if (isMatch || !incomingPartNumber) {
+        useToastStore.getState().showToast(
+          `[IoT WEBHOOK SCAN] Event diterima dari endpoint IoT (${data?.partNumber || data?.model || 'QR-1008'})`,
+          'info'
+        );
+        processQrCode('AiG2cCqE');
+      }
+    };
+
+    socket.on('qr_scanned', handleQrScannedSocket);
+    return () => {
+      socket.off('qr_scanned', handleQrScannedSocket);
+    };
+  }, [machineKey, activeJob, processQrCode]);
 
   const isFirstInShift = useMemo(() => {
     if (!jobs || jobs.length === 0 || !activeJob) return false;

@@ -65,7 +65,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     shikake: '2',
     customer_pno: '',
     customer_sebango: '',
-    spec: '6'
+    spec: '6',
+    qr_webhook_url: ''
   });
 
   // Manual Form State
@@ -87,7 +88,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     shikake: '2',
     customer_pno: '',
     customer_sebango: '',
-    spec: '6'
+    spec: '6',
+    qr_webhook_url: ''
   });
 
   // Machines state
@@ -398,7 +400,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       customer_pno: customer_pno.trim(),
       customer_sebango: customer_sebango.trim(),
       spec: parseInt(spec) || 6,
-      process: 'injection'
+      process: 'injection',
+      qr_webhook_url: manualForm.qr_webhook_url?.trim() || undefined
     };
 
     setIsLoading(true);
@@ -423,7 +426,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
         shikake: '2',
         customer_pno: '',
         customer_sebango: '',
-        spec: '6'
+        spec: '6',
+        qr_webhook_url: ''
       });
       fetchParts();
     } catch (err: any) {
@@ -453,7 +457,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       shikake: part.shikake?.toString() || '2',
       customer_pno: part.customer_pno || '',
       customer_sebango: part.customer_sebango || '',
-      spec: part.spec?.toString() || '6'
+      spec: part.spec?.toString() || '6',
+      qr_webhook_url: part.qr_webhook_url || ''
     });
   };
 
@@ -494,7 +499,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       shikake,
       customer_pno,
       customer_sebango,
-      spec
+      spec,
+      qr_webhook_url
     } = editForm;
 
     if (!part_number || !part_name || !model || !customer || !sebango) {
@@ -522,7 +528,8 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       customer_pno: customer_pno.trim(),
       customer_sebango: customer_sebango.trim(),
       spec: parseInt(spec) || 6,
-      process: 'injection'
+      process: 'injection',
+      qr_webhook_url: qr_webhook_url?.trim() || undefined
     };
 
     setIsLoading(true);
@@ -1034,6 +1041,21 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     />
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
+                      <span>IoT Webhook URL (QR Listener)</span>
+                      <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="qr_webhook_url"
+                      value={manualForm.qr_webhook_url || ''}
+                      onChange={handleManualInput}
+                      placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                    />
+                  </div>
+
                   <button
                     type="submit"
                     style={{ backgroundColor: colorPrimary }}
@@ -1098,13 +1120,14 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     <th className="px-6 py-4">Part Info</th>
                     <th className="px-6 py-4">Routing Line</th>
                     <th className="px-6 py-4">Spec</th>
+                    <th className="px-6 py-4">IoT Webhook URL</th>
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-700 dark:text-white">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                         <div className="flex items-center justify-center gap-2">
                           <RefreshCw className="h-4 w-4 animate-spin text-[#E76114]" />
                           <span>Memproses data master parts...</span>
@@ -1113,7 +1136,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     </tr>
                   ) : filteredParts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                         Tidak ada part ditemukan di database.
                       </td>
                     </tr>
@@ -1140,6 +1163,15 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                         <td className="px-6 py-4 text-left">
                           <div className="font-bold text-slate-700 dark:text-slate-300">CT: {part.cycle_time}s</div>
                           <div className="text-[9px] text-slate-400 dark:text-slate-400 mt-0.5 font-mono">Cavity: {part.cavity} | Shikake: {part.shikake}x</div>
+                        </td>
+                        <td className="px-6 py-4 text-left max-w-xs truncate font-mono text-[10px]">
+                          {part.qr_webhook_url ? (
+                            <span className="bg-slate-100 dark:bg-slate-950 px-2 py-1 rounded border border-slate-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400" title={part.qr_webhook_url}>
+                              {part.qr_webhook_url}
+                            </span>
+                          ) : (
+                            <span className="italic text-slate-400 dark:text-slate-600 text-[9px]">- Belum diatur -</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-1">
@@ -1310,6 +1342,22 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                       className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary font-mono"
                     />
                   </div>
+                </div>
+
+                {/* IoT Webhook URL */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
+                    <span>IoT Webhook URL (QR Listener)</span>
+                    <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="qr_webhook_url"
+                    value={editForm.qr_webhook_url || ''}
+                    onChange={handleEditInput}
+                    placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                  />
                 </div>
               </div>
 

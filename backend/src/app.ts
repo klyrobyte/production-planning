@@ -19,10 +19,14 @@ import { createProductionPlansRoutes } from './modules/production-plans/producti
 import { globalLogsRoutes } from './modules/global-logs/global-logs.routes';
 import { siteConfigRoutes } from './modules/site-config/site-config.routes';
 import { btPrintersRoutes } from './modules/bt-printers/bt-printers.routes';
+import { qrWebhookRouter, startQrWebhookPoller } from './modules/machines/qr-webhook.service';
 
 // Creates and configures the Express app
 export const createApp = () => {
   const app = express();
+
+  // Jalankan background poller QR Webhook IoT
+  startQrWebhookPoller(1000);
 
   // --- Global Middleware ---
   app.use(cors({ origin: true, credentials: true }));
@@ -31,6 +35,9 @@ export const createApp = () => {
 
   // --- Audit Log Middleware (must be before routes so res.on('finish') fires correctly) ---
   app.use(auditLogMiddleware);
+
+  // --- Webhook & Mock Router (bisa diakses di /iot/... dan /api/webhook/...) ---
+  app.use(qrWebhookRouter);
 
   // --- API Documentation ---
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
