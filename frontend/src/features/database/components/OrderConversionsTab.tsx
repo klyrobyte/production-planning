@@ -70,40 +70,6 @@ export default function OrderConversionsTab({ refreshTrigger }: OrderConversions
     fetchConversions();
   }, [fetchConversions, refreshTrigger]);
 
-  const parseConversionsCSVContent = (content: string): any[] => {
-    const lines = content.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return [];
-
-    const separator = lines[0].includes('\t') ? '\t' : ',';
-    const headers = lines[0].split(separator).map(h => h.trim().toUpperCase());
-
-    const custPartIdx = headers.findIndex(h => h.includes('CUST_PART') || h.includes('CUSTOMER_PART') || h.includes('PART_NUMBER') || h.includes('CUST_PN') || h.includes('PART NUMBER') || h === 'PART_NUMBER' || h === 'CUST_PART_NUMBER');
-    const custSebIdx = headers.findIndex(h => h.includes('CUST_SEB') || h.includes('CUSTOMER_SEBANGO') || h === 'CUST_SEBANGO');
-    const prodSebIdx = headers.findIndex(h => h.includes('PROD_SEB') || h.includes('PRODUCTION_SEBANGO') || h.includes('SEBANGO') || h === 'PROD_SEBANGO');
-    const categoryIdx = headers.findIndex(h => h.includes('CATEGORY') || h.includes('PART_CATEGORY') || h === 'PART_CATEGORY');
-
-    const results: any[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(separator).map(c => c.trim());
-      if (cols.length === 0) continue;
-
-      const cust_part_number = custPartIdx !== -1 ? cols[custPartIdx] : cols[0];
-      const cust_sebango = custSebIdx !== -1 ? cols[custSebIdx] : 'CUST-SEB';
-      const prod_sebango = prodSebIdx !== -1 ? cols[prodSebIdx] : cols[1];
-      const part_category = categoryIdx !== -1 ? cols[categoryIdx].toLowerCase() : 'big';
-
-      if (!cust_part_number || !prod_sebango) continue;
-
-      results.push({
-        cust_part_number,
-        cust_sebango: cust_sebango || 'CUST-SEB',
-        prod_sebango,
-        part_category: part_category === 'small' ? 'small' : 'big'
-      });
-    }
-    return results;
-  };
-
   const handleCSVUploadConversions = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

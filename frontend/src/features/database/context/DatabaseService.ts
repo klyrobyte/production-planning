@@ -419,7 +419,7 @@ export class DatabaseService {
 
   // ── FORM VALIDATION METHODS ──
 
-  validatePartForm(partNumber: string, partName: string, model?: string): string | null {
+  validatePartForm(partNumber: string, partName: string, _model?: string): string | null {
     if (!partNumber.trim()) return 'Part number wajib diisi.';
     if (!partName.trim()) return 'Part name wajib diisi.';
     return null;

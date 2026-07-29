@@ -22,7 +22,9 @@ export const initSocket = (): Socket => {
     return _socket;
   }
 
-  _socket = io({
+  const socketUrl = import.meta.env.VITE_SOCKET_URL || undefined;
+
+  _socket = io(socketUrl, {
     autoConnect: false,
     transports: ['polling', 'websocket'],
     withCredentials: true,

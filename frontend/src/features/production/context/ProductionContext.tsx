@@ -1075,8 +1075,6 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         const jobs = currentJobsMap[planKey] || [];
         if (jobs.length === 0) return;
 
-        const dayOT = dayOTsRef.current[planKey] || 'teiji';
-        const nightOT = nightOTsRef.current[planKey] || 'teiji';
         const abnormality = activeAbnormalitiesRef.current[planKey];
         const ngState = activeNgsRef.current[planKey];
 

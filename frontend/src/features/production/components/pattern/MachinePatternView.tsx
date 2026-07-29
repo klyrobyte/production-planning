@@ -1119,7 +1119,6 @@ export function MachinePatternView({
     reorderMachineJobs,
     reorderMachineAvgJobs,
     updateJobStatus,
-    updateOTSettings,
     resetAllMachines,
   } = useProduction();
 
@@ -1214,10 +1213,6 @@ export function MachinePatternView({
     } else {
       reorderMachineJobs(machineKey, finalJobs, activeDate);
     }
-  };
-
-  const applyOvertimeSettings = (dOT: string, nOT: string) => {
-    updateOTSettings(machineKey, dOT, nOT, activeDate);
   };
 
   const handleAction = (jobId: string, action: 'complete-running' | 'complete-dandori') => {
