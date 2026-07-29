@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Play,
@@ -17,6 +17,7 @@ import {
   Minimize,
   Sun,
   Moon,
+  QrCode,
 } from 'lucide-react';
 import { useProduction, getUniqueMachineKey, getTodayDateString } from '../../context/ProductionContext';
 import type { Job } from '../../context/ProductionContext';
@@ -26,6 +27,29 @@ import { useAuthStore } from '../../../../shared/store/useAuthStore';
 import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import { useScreenControls } from '../../../../shared/hooks/useScreenControls';
 import { useBtPrinterStore } from '../../../../shared/store/useBtPrinterStore';
+import { useToastStore } from '../../../../shared/store/useToastStore';
+
+function playScanSuccessBeep() {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, now);
+    osc.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+}
 
 function playLoudKanbanBeep() {
   try {
@@ -296,6 +320,114 @@ export function MachineExecutionView({
     () => jobs.find((j) => j.status === 'running' || j.status === 'dandori') ?? null,
     [jobs]
   );
+
+  const [manualQrInput, setManualQrInput] = useState('');
+  const qrBufferRef = useRef<string>('');
+  const lastKeyTimeRef = useRef<number>(0);
+
+  const processQrCode = (code: string, isFromBroadcast: boolean = false) => {
+    const trimmed = code.trim();
+    const validCodes = ['AiG2cCqE', 'Fqe29Qra'];
+    if (!validCodes.includes(trimmed)) {
+      return false;
+    }
+
+    if (!isFromBroadcast) {
+      try {
+        const bc = new BroadcastChannel('sugity_qr_scan_sync');
+        bc.postMessage({ code: trimmed, timestamp: Date.now() });
+        bc.close();
+      } catch (e) {
+        console.warn('BroadcastChannel error:', e);
+      }
+    }
+
+    if (isReadOnlyMode) {
+      useToastStore.getState().showToast('Mode Read-Only: Tidak dapat memproses scan QR pada tanggal lalu.', 'error');
+      return true;
+    }
+
+    if (!activeJob) {
+      useToastStore.getState().showToast('Tidak ada Job Aktif pada mesin ini untuk mencetak label.', 'warning');
+      return true;
+    }
+
+    if (activeJob.status !== 'running') {
+      useToastStore.getState().showToast(
+        `Job ${activeJob.model} masih dalam tahap Dandori / Persiapan. Selesaikan Dandori terlebih dahulu sebelum mencetak label!`,
+        'warning'
+      );
+      return true;
+    }
+
+    const printQty = activeJob.spec ?? 24;
+    playScanSuccessBeep();
+    incrementJobProgress(machineKey, activeJob.id, printQty, selectedDate, partsData, {
+      type: 'progress',
+      note: getLogNote(`Print label ${activeJob.model}: +${printQty} pcs`),
+    });
+
+    useToastStore.getState().showToast(`[QR SCAN SUCCESS] Print label ${activeJob.model}: +${printQty} pcs`, 'success');
+    return true;
+  };
+
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('sugity_qr_scan_sync');
+      bc.onmessage = (event) => {
+        if (event.data?.code) {
+          processQrCode(event.data.code, true);
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel init error:', e);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const targetEl = e.target as HTMLElement;
+      const isInputElement =
+        targetEl &&
+        (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA' || targetEl.tagName === 'SELECT');
+
+      if (e.key === 'Enter') {
+        const scannedStr = qrBufferRef.current.trim();
+        qrBufferRef.current = '';
+        if (scannedStr) {
+          const handled = processQrCode(scannedStr);
+          if (handled && !isInputElement) {
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const now = Date.now();
+        if (now - lastKeyTimeRef.current > 500 && !isInputElement) {
+          qrBufferRef.current = '';
+        }
+        lastKeyTimeRef.current = now;
+        qrBufferRef.current += e.key;
+
+        const currentBuf = qrBufferRef.current;
+        for (const targetCode of ['AiG2cCqE', 'Fqe29Qra']) {
+          if (currentBuf.endsWith(targetCode)) {
+            qrBufferRef.current = '';
+            processQrCode(targetCode);
+            if (!isInputElement) e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeJob, machineKey, selectedDate, partsData, isReadOnlyMode, userInitials]);
 
   const isFirstInShift = useMemo(() => {
     if (!jobs || jobs.length === 0 || !activeJob) return false;
@@ -624,36 +756,72 @@ export function MachineExecutionView({
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-900 p-4 sm:p-6 space-y-5">
-      {/* Fullscreen & Always Awake Toolbar */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={toggleWakeLock}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-            isWakeLockActive
-              ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
-          }`}
-          title={
-            isWakeLockActive
-              ? 'Screen stay-awake aktif — klik untuk nonaktifkan'
-              : 'Aktifkan screen stay-awake agar tablet tidak mati otomatis'
-          }
-        >
-          {isWakeLockActive ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          {isWakeLockActive ? 'Awake On' : 'Stay Awake'}
-        </button>
-        <button
-          onClick={toggleFullscreen}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
-            isFullscreen
-              ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
-          }`}
-          title={isFullscreen ? 'Keluar dari fullscreen' : 'Masuk fullscreen mode'}
-        >
-          {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-          {isFullscreen ? 'Exit FS' : 'Fullscreen'}
-        </button>
+      {/* Toolbar: QR Scanner Indicator, Fullscreen & Wake Lock */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl shadow-sm">
+          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+            <QrCode className="w-3.5 h-3.5 animate-pulse" /> QR Scanner Mode: Active
+          </span>
+          <div className="h-3.5 w-px bg-slate-200 dark:bg-slate-800" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualQrInput.trim()) {
+                const handled = processQrCode(manualQrInput.trim());
+                if (!handled) {
+                  useToastStore.getState().showToast(`String '${manualQrInput}' bukan kode QR print yang valid.`, 'warning');
+                }
+                setManualQrInput('');
+              }
+            }}
+            className="flex items-center gap-1.5"
+          >
+            <input
+              type="text"
+              placeholder="Simulasi Scan QR..."
+              value={manualQrInput}
+              onChange={(e) => setManualQrInput(e.target.value)}
+              className="w-28 sm:w-36 px-2 py-0.5 text-[10px] font-mono border border-slate-200 dark:border-slate-800 rounded bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-emerald-500"
+            />
+            <button
+              type="submit"
+              className="px-2 py-0.5 text-[9px] font-extrabold uppercase bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer transition-colors"
+            >
+              Scan
+            </button>
+          </form>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleWakeLock}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
+              isWakeLockActive
+                ? 'bg-amber-500 border-amber-600 text-white shadow-amber-500/30'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-400 hover:text-amber-600'
+            }`}
+            title={
+              isWakeLockActive
+                ? 'Screen stay-awake aktif — klik untuk nonaktifkan'
+                : 'Aktifkan screen stay-awake agar tablet tidak mati otomatis'
+            }
+          >
+            {isWakeLockActive ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {isWakeLockActive ? 'Awake On' : 'Stay Awake'}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm ${
+              isFullscreen
+                ? 'bg-indigo-600 border-indigo-700 text-white shadow-indigo-500/30'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
+            }`}
+            title={isFullscreen ? 'Keluar dari fullscreen' : 'Masuk fullscreen mode'}
+          >
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            {isFullscreen ? 'Exit FS' : 'Fullscreen'}
+          </button>
+        </div>
       </div>
 
       {/* Read-Only Warning Banner */}
