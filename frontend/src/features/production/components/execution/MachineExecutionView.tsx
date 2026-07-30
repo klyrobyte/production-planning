@@ -53,36 +53,8 @@ function playScanSuccessBeep() {
 }
 
 function playLoudKanbanBeep() {
-  try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const now = ctx.currentTime;
-
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'square';
-    osc1.frequency.setValueAtTime(960, now);
-    gain1.gain.setValueAtTime(0.5, now);
-    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.25);
-
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'square';
-    osc2.frequency.setValueAtTime(770, now + 0.26);
-    gain2.gain.setValueAtTime(0.5, now + 0.26);
-    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.52);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.26);
-    osc2.stop(now + 0.52);
-  } catch (e) {
-    console.warn('Audio playback error:', e);
-  }
+  // Sound alarm disabled temporarily as requested
+  return;
 }
 
 interface MachineExecutionViewProps {
@@ -548,6 +520,10 @@ export function MachineExecutionView({
   }, [activeJob, currentLiveTime, abnormality, ngState]);
 
   useEffect(() => {
+    // Sound alarm disabled temporarily as requested
+    const ENABLE_KANBAN_ALARM = false;
+    if (!ENABLE_KANBAN_ALARM) return;
+
     const shouldPlayLoop =
       activePortal === 'member' &&
       activeJob !== null &&
