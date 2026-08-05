@@ -16,6 +16,24 @@ export const productionPlansRepository = {
     return rows[0] || null;
   },
 
+  findByDateAndMachine: async (dateKey: string, machineKey: string) => {
+    // Normalisasi pencarian machineKey (contoh: 'F2-MC-6', 'MC 6', 'MC6')
+    const cleanKey = machineKey.replace(/[^a-zA-Z0-9]/g, '');
+    const { rows } = await pool.query(
+      `SELECT * FROM production_plans 
+       WHERE date_key = $1 
+         AND (
+           LOWER(machine_id) = LOWER($2)
+           OR LOWER(id) = LOWER($3)
+           OR REPLACE(LOWER(machine_id), '-', '') LIKE LOWER($4)
+           OR REPLACE(LOWER(id), '-', '') LIKE LOWER($4)
+         )
+       ORDER BY updated_at DESC LIMIT 1`,
+      [dateKey, machineKey, `${dateKey}_${machineKey}`, `%${cleanKey}%`]
+    );
+    return rows[0] || null;
+  },
+
   // Upserts a plan by its composite ID (e.g. '2025-01-15_F2-MC-1').
   // All mutable columns included so abnormality/NG state and logs
   // are never silently discarded on save.

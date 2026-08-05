@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { 
-  Upload, 
-  Plus, 
-  Search, 
-  CheckCircle, 
-  AlertTriangle, 
-  FileSpreadsheet, 
+import {
+  Upload,
+  Plus,
+  Search,
+  CheckCircle,
+  AlertTriangle,
+  FileSpreadsheet,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
@@ -21,9 +21,61 @@ import { useThemeStore } from '../../../shared/store/useThemeStore';
 import { useToastStore } from '../../../shared/store/useToastStore';
 import type { PartItem, MasterPartsTabProps } from '../context/DatabaseTypes';
 import { databaseService } from '../context/DatabaseService';
+import api from '../../../shared/lib/axios';
 
 export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
+
+  // POLRI IoT QR List state
+  const [polriQrList, setPolriQrList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('https://api.polri.web.id/api/v1/qr-list')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setPolriQrList(data);
+      })
+      .catch(() => {
+        api.get('/api/polri/qr-list').then((res) => {
+          if (Array.isArray(res.data)) setPolriQrList(res.data);
+        }).catch(() => { });
+      });
+  }, []);
+
+  const getCleanMachineCode = (lineStr?: string) => {
+    if (!lineStr) return '';
+    const match = lineStr.match(/mc[-#\s]?(\d+)/i) || lineStr.match(/(\d+)/);
+    return match ? `mc${match[1]}` : '';
+  };
+
+  const handleAutoFillPolriUrl = (isEdit: boolean, qrCodeOverride?: string) => {
+    const targetForm = isEdit ? editForm : manualForm;
+    const targetLine = targetForm.home_line;
+
+    // Cari item POLRI QR yang sesuai dari daftar qr-list
+    const polriItem = polriQrList.find((q) => q.qr === qrCodeOverride);
+
+    // Ambil kode mesin dari Home Line form, atau jika kosong dari machine_origin milik POLRI QR item
+    let mcCode = getCleanMachineCode(targetLine);
+    if (!mcCode && polriItem?.machine_origin) {
+      mcCode = getCleanMachineCode(polriItem.machine_origin);
+    }
+
+    const qr = qrCodeOverride || (polriItem ? polriItem.qr : 'QR-1008');
+    const finalMc = mcCode || (polriItem?.machine_origin ? getCleanMachineCode(polriItem.machine_origin) : 'mc1');
+
+    if (!finalMc && !qrCodeOverride) {
+      useToastStore.getState().showToast('Pilih Home Line mesin atau pilih QR dari dropdown terlebih dahulu.', 'warning');
+      return;
+    }
+
+    const generatedUrl = `https://api.polri.web.id/iot/${finalMc}/${qr}`;
+    if (isEdit) {
+      setEditForm((prev) => ({ ...prev, qr_webhook_url: generatedUrl }));
+    } else {
+      setManualForm((prev) => ({ ...prev, qr_webhook_url: generatedUrl }));
+    }
+  };
 
   // Parts listing state
   const [parts, setParts] = useState<PartItem[]>([]);
@@ -135,7 +187,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
       try {
         const text = e.target?.result as string;
         const { parsedParts, count } = databaseService.parseMasterPartsCSV(text, machines);
-        
+
         if (count === 0) {
           setCsvError('Tidak ada part valid yang ditemukan. Pastikan kolom header sesuai format.');
           setParsedPreview([]);
@@ -506,22 +558,20 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
             <div className="flex bg-slate-50 dark:bg-slate-950 border-b border-slate-200/60 dark:border-slate-800/80 p-1.5 gap-1">
               <button
                 onClick={() => setActiveTab('csv')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
-                  activeTab === 'csv'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-800/50'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${activeTab === 'csv'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-800/50'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                  }`}
               >
                 <Upload className="w-3.5 h-3.5" />
                 CSV Import
               </button>
               <button
                 onClick={() => setActiveTab('manual')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
-                  activeTab === 'manual'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-800/50'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${activeTab === 'manual'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-800/50'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                  }`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Manual Form
@@ -558,13 +608,12 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     onClick={triggerFileDialog}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative group overflow-hidden ${
-                      isDragOver
-                        ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 shadow-inner'
-                        : parsedPreview.length > 0
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 relative group overflow-hidden ${isDragOver
+                      ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 shadow-inner'
+                      : parsedPreview.length > 0
                         ? 'border-emerald-350 bg-emerald-50/5 dark:bg-emerald-950/5'
                         : 'border-slate-300 dark:border-slate-700 hover:border-[#E76114] hover:bg-slate-50/50 dark:hover:bg-slate-955/50'
-                    }`}
+                      }`}
                   >
                     {isUploading ? (
                       <div className="space-y-3">
@@ -610,7 +659,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                           Siap Disimpan
                         </span>
                       </div>
-                      
+
                       <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
                         {parsedPreview.slice(0, 5).map((part, index) => (
                           <div key={index} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-950 transition-colors flex justify-between items-center text-[10px]">
@@ -907,19 +956,48 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
-                      <span>IoT Webhook URL (QR Listener)</span>
-                      <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="qr_webhook_url"
-                      value={manualForm.qr_webhook_url || ''}
-                      onChange={handleManualInput}
-                      placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
-                    />
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white">
+                        IoT Webhook URL (QR Listener)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleAutoFillPolriUrl(false)}
+                        className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        ⚡ Auto-Generate POLRI URL
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="qr_webhook_url"
+                        value={manualForm.qr_webhook_url || ''}
+                        onChange={handleManualInput}
+                        placeholder="https://api.polri.web.id/iot/mc6/QR-1008"
+                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                      />
+                      {polriQrList.length > 0 && (
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) handleAutoFillPolriUrl(false, e.target.value);
+                          }}
+                          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-2 text-[10px] font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer max-w-[130px]"
+                          defaultValue=""
+                        >
+                          <option value="">Pilih POLRI QR...</option>
+                          {polriQrList.map((item: any) => (
+                            <option key={item.id || item.qr} value={item.qr}>
+                              {item.qr} {item.machine_origin ? `[${item.machine_origin}]` : ''} - {item.part_name || 'POLRI'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <span className="text-[8px] font-mono text-slate-400 block">
+                      e.g. https://api.polri.web.id/iot/mc6/QR-1004
+                    </span>
                   </div>
 
                   <button
@@ -1109,7 +1187,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                   <p className="text-[10px] text-white/80 font-bold uppercase tracking-wider mt-0.5 font-mono">{selectedPartForEdit.part_number}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedPartForEdit(null)}
                 className="p-1 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
               >
@@ -1210,20 +1288,48 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                   </div>
                 </div>
 
-                {/* IoT Webhook URL */}
-                <div className="space-y-1 pt-1">
-                  <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white flex items-center justify-between">
-                    <span>IoT Webhook URL (QR Listener)</span>
-                    <span className="text-[8px] font-mono text-emerald-600 dark:text-emerald-400">e.g. http://172.19.82.34:4000/iot/mc6/QR-1008</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="qr_webhook_url"
-                    value={editForm.qr_webhook_url || ''}
-                    onChange={handleEditInput}
-                    placeholder="http://172.19.82.34:4000/iot/mc6/QR-1008"
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
-                  />
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white">
+                      IoT Webhook URL (QR Listener)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFillPolriUrl(true)}
+                      className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      ⚡ Auto-Generate POLRI URL
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="qr_webhook_url"
+                      value={editForm.qr_webhook_url || ''}
+                      onChange={handleEditInput}
+                      placeholder="https://api.polri.web.id/iot/mc6/QR-1008"
+                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
+                    />
+                    {polriQrList.length > 0 && (
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) handleAutoFillPolriUrl(true, e.target.value);
+                        }}
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-2 text-[10px] font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer max-w-[130px]"
+                        defaultValue=""
+                      >
+                        <option value="">Pilih POLRI QR...</option>
+                        {polriQrList.map((item: any) => (
+                          <option key={item.id || item.qr} value={item.qr}>
+                            {item.qr} {item.machine_origin ? `[${item.machine_origin}]` : ''} - {item.part_name || 'POLRI'}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <span className="text-[8px] font-mono text-slate-400 block">
+                    e.g. https://api.polri.web.id/iot/mc6/QR-1004
+                  </span>
                 </div>
               </div>
 

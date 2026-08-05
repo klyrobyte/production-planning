@@ -427,10 +427,10 @@ export function MachineExecutionView({
 
       if (isMatch || !incomingPartNumber) {
         useToastStore.getState().showToast(
-          `[IoT WEBHOOK SCAN] Event diterima dari endpoint IoT (${data?.partNumber || data?.model || 'QR-1008'})`,
+          `[IoT WEBHOOK SCAN] Scan terdeteksi oleh server untuk (${data?.partNumber || data?.model || 'QR-1008'})`,
           'info'
         );
-        processQrCode('AiG2cCqE');
+        // Backend service kini memproses penambahan Qty & Activity Log secara otomatis
       }
     };
 
@@ -438,7 +438,7 @@ export function MachineExecutionView({
     return () => {
       socket.off('qr_scanned', handleQrScannedSocket);
     };
-  }, [machineKey, activeJob, processQrCode]);
+  }, [machineKey, activeJob]);
 
   const isFirstInShift = useMemo(() => {
     if (!jobs || jobs.length === 0 || !activeJob) return false;

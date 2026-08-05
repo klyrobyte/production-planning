@@ -373,23 +373,41 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       console.error('[Socket] Connection error:', err.message || err);
     };
 
+    const isSamePlanKey = (keyA: string, keyB: string): boolean => {
+      if (!keyA || !keyB) return false;
+      if (keyA.toLowerCase() === keyB.toLowerCase()) return true;
+      const cleanA = keyA.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const cleanB = keyB.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      return cleanA === cleanB;
+    };
+
     const handlePlanUpdated = (row: any) => {
+      if (!row || !row.id) return;
       const lastWrite = lastLocalWriteRef.current[row.id];
       if (lastWrite && Date.now() - lastWrite < 5000) return;
+
+      const updateKeyMap = <T,>(prev: Record<string, T>, value: T) => {
+        const next = { ...prev, [row.id]: value };
+        Object.keys(prev).forEach((k) => {
+          if (isSamePlanKey(k, row.id)) {
+            next[k] = value;
+          }
+        });
+        return next;
+      };
+
       if (row.plan_type === 'daily') {
-        setMachineJobs((prev) => ({ ...prev, [row.id]: row.jobs || [] }));
+        setMachineJobs((prev) => updateKeyMap(prev, row.jobs || []));
       }
-      if (row.day_ot) setDayOTs((prev) => ({ ...prev, [row.id]: row.day_ot }));
-      if (row.night_ot) setNightOTs((prev) => ({ ...prev, [row.id]: row.night_ot }));
-      if (row.logs) setLogs((prev) => ({ ...prev, [row.id]: row.logs }));
-      setActiveAbnormalities((prev) => ({
-        ...prev,
-        [row.id]: { isAbnormal: !!row.is_abnormal, type: row.abnormal_type || '', start: row.abnormal_start || '' },
-      }));
-      setActiveNgs((prev) => ({
-        ...prev,
-        [row.id]: { isNg: !!row.is_ng, type: row.ng_type || '', start: row.ng_start || '' },
-      }));
+      if (row.day_ot) setDayOTs((prev) => updateKeyMap(prev, row.day_ot));
+      if (row.night_ot) setNightOTs((prev) => updateKeyMap(prev, row.night_ot));
+      if (row.logs) setLogs((prev) => updateKeyMap(prev, row.logs || []));
+
+      const abnVal = { isAbnormal: !!row.is_abnormal, type: row.abnormal_type || '', start: row.abnormal_start || '' };
+      setActiveAbnormalities((prev) => updateKeyMap(prev, abnVal));
+
+      const ngVal = { isNg: !!row.is_ng, type: row.ng_type || '', start: row.ng_start || '' };
+      setActiveNgs((prev) => updateKeyMap(prev, ngVal));
     };
 
     socket.on('connect', handleConnect);
