@@ -165,7 +165,23 @@ export const createProductionPlansService = () => ({
     if (io) {
       io.emit('production_plan_updated', savedPlan);
       io.to(`plan:${savedPlan.id}`).emit('production_plan_updated', savedPlan);
-      io.emit('qr_scan_processed', { scanData, planId: savedPlan.id, addedQty: printQty, newQty });
+      io.emit('qr_scan_processed', { scanData, planId: savedPlan.id, addedQty: printQty, newQty, machineId: plan.machine_id, jobId: runningJob.id });
+      io.emit('auto_print_kanban_trigger', {
+        machineId: plan.machine_id,
+        jobId: runningJob.id,
+        partNumber: modelName,
+        addedQty: printQty,
+        scanData,
+      });
+      if (plan.machine_id) {
+        io.to(`plan:${plan.machine_id}`).emit('auto_print_kanban_trigger', {
+          machineId: plan.machine_id,
+          jobId: runningJob.id,
+          partNumber: modelName,
+          addedQty: printQty,
+          scanData,
+        });
+      }
     }
 
     console.log(`[Backend Scan Process] 🚀 SUCCESS: Mesin ${savedPlan.machine_id} | Job ${modelName} | +${printQty} pcs (${newQty}/${targetQty})`);

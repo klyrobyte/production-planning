@@ -570,7 +570,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
       const nowTimeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       if (action === 'complete-running') {
         const closedNg = closedNgQty ?? updated[idx].closedNgQty ?? 0;
-        const defaultOk = Math.max(0, (updated[idx].actualQty || 0) - closedNg);
+        const defaultOk = updated[idx].actualQty || 0;
         const closedOk = closedOkQty !== undefined ? closedOkQty : defaultOk;
 
         const remainingInShift = updated.filter(
@@ -590,53 +590,6 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
           finalDandoriStart: isLastInShift ? updated[idx].finalDandoriStart || nowTimeStr : updated[idx].finalDandoriStart,
         };
         updated[idx] = completedJob;
-
-        const shortage = completedJob.qtyLot - closedOk;
-        if (shortage > 0) {
-          if (completedJob.shift === 'day') {
-            const nextSameIdx = updated.findIndex(
-              (j, fIdx) => fIdx > idx && j.model === completedJob.model && j.status !== 'completed'
-            );
-            if (nextSameIdx !== -1) {
-              const targetJob = updated[nextSameIdx];
-              const newQtyLot = targetJob.qtyLot + shortage;
-              const cavity = targetJob.kav || 1;
-              const ct = targetJob.ct || 60;
-              const newTime = Math.round(((newQtyLot / cavity) * ct) / 60);
-              updated[nextSameIdx] = {
-                ...targetJob,
-                qtyLot: newQtyLot,
-                time: newTime,
-              };
-            } else {
-              const cavity = completedJob.kav || 1;
-              const ct = completedJob.ct || 60;
-              const newTime = Math.round(((shortage / cavity) * ct) / 60);
-              const carryJob: Job = {
-                ...completedJob,
-                id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                qtyLot: shortage,
-                actualQty: 0,
-                closedNgQty: 0,
-                closedOkQty: 0,
-                status: 'queued',
-                shift: 'night',
-                time: newTime,
-                actualProductionStart: undefined,
-                actualProductionEnd: undefined,
-                actualDandoriStart: undefined,
-                actualDandoriEnd: undefined,
-                downtimeMinutes: 0,
-              };
-              const firstNightIdx = updated.findIndex((j) => j.shift === 'night');
-              if (firstNightIdx !== -1) {
-                updated.splice(firstNightIdx, 0, carryJob);
-              } else {
-                updated.push(carryJob);
-              }
-            }
-          }
-        }
         if (idx + 1 < updated.length && updated[idx + 1].shift === updated[idx].shift) {
           updated[idx + 1] = {
             ...updated[idx + 1],
@@ -711,38 +664,13 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
 
     const lastJobInShift = shiftJobs[shiftJobs.length - 1];
     let nextLogs = [...(logs[finalKey] || [])];
-    const carriedOverJobs: Job[] = [];
 
     const updated = list.map((j) => {
       if (j.shift === shift) {
         const closedNg = j.closedNgQty || 0;
-        const effectiveOk = j.closedOkQty !== undefined ? j.closedOkQty : Math.max(0, (j.actualQty || 0) - closedNg);
+        const effectiveOk = j.closedOkQty !== undefined ? j.closedOkQty : (j.actualQty || 0);
         const hasStarted = !!j.actualProductionStart;
         const isLast = j.id === lastJobInShift.id;
-        const remainingQty = j.qtyLot - effectiveOk;
-
-        if (remainingQty > 0 && shift === 'day') {
-          const cavity = j.kav || 1;
-          const ct = j.ct || 60;
-          const newTime = Math.round(((remainingQty / cavity) * ct) / 60);
-
-          carriedOverJobs.push({
-            ...j,
-            id: `job-carryover-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            qtyLot: remainingQty,
-            actualQty: 0,
-            closedNgQty: 0,
-            closedOkQty: 0,
-            status: 'queued',
-            shift: 'night',
-            time: newTime,
-            actualProductionStart: undefined,
-            actualProductionEnd: undefined,
-            actualDandoriStart: undefined,
-            actualDandoriEnd: undefined,
-            downtimeMinutes: 0,
-          });
-        }
 
         if (j.status !== 'completed') {
           const autoLog = {
@@ -793,9 +721,7 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
         date: recordDate,
         time,
         type: 'success',
-        message: `[SHIFT CLOSED] Penutupan produksi shift ${shift.toUpperCase()} selesai.${
-          shift === 'day' ? ' Sisa target ditransfer ke shift malam.' : ' Shift malam selesai.'
-        } (${userInitials})`,
+        message: `[SHIFT CLOSED] Penutupan produksi shift ${shift.toUpperCase()} selesai. (${userInitials})`,
       };
       nextLogs.unshift(shiftClosedLog);
     }
@@ -815,19 +741,6 @@ export function ProductionProvider({ children }: { children: React.ReactNode }) 
     setLogs((prev) => ({ ...prev, [finalKey]: deduplicatedLogs }));
 
     let solved = productionService.recalculateTimeline(updated);
-
-    if (shift === 'day' && carriedOverJobs.length > 0) {
-      const firstNightIdx = solved.findIndex((j) => j.shift === 'night');
-      if (firstNightIdx !== -1) {
-        solved.splice(firstNightIdx, 0, ...carriedOverJobs);
-      } else {
-        solved.push(...carriedOverJobs);
-      }
-      solved.forEach((j, idx) => {
-        j.seq = idx + 1;
-      });
-      solved = productionService.recalculateTimeline(solved);
-    }
 
     setMachineJobs((prev) => ({ ...prev, [finalKey]: solved }));
     savePlanToDatabase(

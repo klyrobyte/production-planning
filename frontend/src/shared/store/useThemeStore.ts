@@ -10,6 +10,10 @@ interface ThemeState {
   browserTitle: string;
   machineTypes: string;
   abnormalityTypes: string;
+  qrWebhookDomain: string;
+  qrWebhookEndpointQrList: string;
+  qrWebhookEndpointMcList: string;
+  qrWebhookEndpointIot: string;
   isLoading: boolean;
   darkMode: boolean;
   toggleDarkMode: () => void;
@@ -23,6 +27,10 @@ interface ThemeState {
     browser_title?: string;
     machine_types?: string;
     abnormality_types?: string;
+    qr_webhook_domain?: string;
+    qr_webhook_endpoint_qr_list?: string;
+    qr_webhook_endpoint_mc_list?: string;
+    qr_webhook_endpoint_iot?: string;
   }) => Promise<void>;
 }
 
@@ -72,6 +80,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
   browserTitle: 'SC Prod Plan',
   machineTypes: 'injection,painting',
   abnormalityTypes: DEFAULT_ABNORMALITY_TYPES,
+  qrWebhookDomain: 'https://api.polri.web.id',
+  qrWebhookEndpointQrList: '/api/v1/qr-list',
+  qrWebhookEndpointMcList: '/api/v1/mc-list',
+  qrWebhookEndpointIot: '/iot/{mc}/{factory}/{qr}',
   isLoading: false,
   darkMode: localStorage.getItem('sugity_dark_mode') === 'true',
 
@@ -106,6 +118,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const bTitle = data.browser_title || 'SC Prod Plan';
       const mTypes = data.machine_types || 'injection,painting';
       const abnTypes = data.abnormality_types || DEFAULT_ABNORMALITY_TYPES;
+      const qrDomain = data.qr_webhook_domain || 'https://api.polri.web.id';
+      const qrListEp = data.qr_webhook_endpoint_qr_list || '/api/v1/qr-list';
+      const mcListEp = data.qr_webhook_endpoint_mc_list || '/api/v1/mc-list';
+      const iotEp = data.qr_webhook_endpoint_iot || '/iot/{mc}/{factory}/{qr}';
       
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -117,6 +133,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
         browserTitle: bTitle,
         machineTypes: mTypes,
         abnormalityTypes: abnTypes,
+        qrWebhookDomain: qrDomain,
+        qrWebhookEndpointQrList: qrListEp,
+        qrWebhookEndpointMcList: mcListEp,
+        qrWebhookEndpointIot: iotEp,
       });
     } catch (err) {
       console.error('Failed to load site config theme:', err);
@@ -139,6 +159,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
       const bTitle = data.browser_title || 'SC Prod Plan';
       const mTypes = data.machine_types || 'injection,painting';
       const abnTypes = data.abnormality_types || DEFAULT_ABNORMALITY_TYPES;
+      const qrDomain = data.qr_webhook_domain || 'https://api.polri.web.id';
+      const qrListEp = data.qr_webhook_endpoint_qr_list || '/api/v1/qr-list';
+      const mcListEp = data.qr_webhook_endpoint_mc_list || '/api/v1/mc-list';
+      const iotEp = data.qr_webhook_endpoint_iot || '/iot/{mc}/{factory}/{qr}';
 
       applyThemeToDOM(primary, secondary, navbar, bTitle, logo);
       set({ 
@@ -150,6 +174,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
         browserTitle: bTitle,
         machineTypes: mTypes,
         abnormalityTypes: abnTypes,
+        qrWebhookDomain: qrDomain,
+        qrWebhookEndpointQrList: qrListEp,
+        qrWebhookEndpointMcList: mcListEp,
+        qrWebhookEndpointIot: iotEp,
       });
     } catch (err) {
       console.error('Failed to update theme config:', err);

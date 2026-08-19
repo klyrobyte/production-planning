@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { masterPartsRepository } from '../master-parts/master-parts.repository';
 import { createProductionPlansService } from '../production-plans/production-plans.service';
 import { getIo } from '../../websocket/socket.server';
+import { getSiteConfig } from '../site-config/site-config.repository';
 
 // State in-memory untuk mock endpoint IoT (e.g. /iot/mc6/QR-1008, /iot/mc6/QR-1009)
 interface MockIotState {
@@ -62,6 +63,11 @@ export function startQrWebhookPoller(intervalMs: number = 1000) {
 
   pollingInterval = setInterval(async () => {
     try {
+      const siteConfig = await getSiteConfig();
+      const domain = (siteConfig.qr_webhook_domain || 'https://api.polri.web.id').replace(/\/+$/, '');
+      const endpointQrList = siteConfig.qr_webhook_endpoint_qr_list || '/api/v1/qr-list';
+      const endpointIotPattern = siteConfig.qr_webhook_endpoint_iot || '/iot/{mc}/{factory}/{qr}';
+
       const urlsToPoll: { url: string; partKey: string; partNumber?: string; model?: string; homeLine?: string }[] = [];
 
       // 1. Ambil URL dari DB Master Parts
@@ -79,17 +85,28 @@ export function startQrWebhookPoller(intervalMs: number = 1000) {
         }
       }
 
-      // 2. Ambil URL dinamis dari POLRI QR List (/api/v1/qr-list)
+      // 2. Ambil URL dinamis dari QR List server IoT
       try {
-        const polriRes = await fetch('https://api.polri.web.id/api/v1/qr-list');
+        const polriRes = await fetch(`${domain}${endpointQrList}`);
         if (polriRes.ok) {
-          const polriItems: any = await polriRes.json();
+          const rawData: any = await polriRes.json();
+          const polriItems: any[] = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+
           if (Array.isArray(polriItems)) {
             for (const item of polriItems) {
               if (!item.qr) continue;
-              const mcMatch = (item.machine_origin || 'MC#6').match(/(\d+)/);
+              const rawMc = item.machine_origin || item.mc || 'MC#6';
+              const rawFactory = item.factory || 'Factory 2';
+              const mcMatch = rawMc.match(/(\d+)/);
               const mcNum = mcMatch ? mcMatch[1] : '6';
-              const polriUrl = `https://api.polri.web.id/iot/mc${mcNum}/${item.qr}`;
+
+              // Format IoT URL menggunakan pattern dari Site Config
+              const formattedPath = endpointIotPattern
+                .replace('{mc}', encodeURIComponent(rawMc))
+                .replace('{factory}', encodeURIComponent(rawFactory))
+                .replace('{qr}', encodeURIComponent(item.qr));
+
+              const polriUrl = `${domain}${formattedPath}`;
 
               if (!urlsToPoll.some((u) => u.url.toLowerCase() === polriUrl.toLowerCase())) {
                 urlsToPoll.push({
@@ -255,34 +272,80 @@ qrWebhookRouter.all('/api/iot/:mc/:qrCode/trigger', handleTriggerMockEndpoint);
 qrWebhookRouter.post('/iot/:mc/:qrCode', handleTriggerMockEndpoint);
 qrWebhookRouter.post('/api/iot/:mc/:qrCode', handleTriggerMockEndpoint);
 
-// POLRI API Proxy Endpoints
-qrWebhookRouter.get('/api/polri/mc-list', async (_req: Request, res: Response) => {
+// POLRI / External IoT API Proxy Endpoints
+const handleGetMcListProxy = async (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   try {
-    const response = await fetch('https://api.polri.web.id/api/v1/mc-list');
-    const data = await response.json();
-    res.json(data);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Gagal fetch mc-list dari POLRI API', message: err.message });
-  }
-});
+    const siteConfig = await getSiteConfig();
+    const domain = (siteConfig.qr_webhook_domain || 'https://api.polri.web.id').replace(/\/+$/, '');
+    const endpoint = siteConfig.qr_webhook_endpoint_mc_list || '/api/v1/mc-list';
 
-qrWebhookRouter.get('/api/polri/qr-list', async (_req: Request, res: Response) => {
-  try {
-    const response = await fetch('https://api.polri.web.id/api/v1/qr-list');
+    const response = await fetch(`${domain}${endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
     const data = await response.json();
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: 'Gagal fetch qr-list dari POLRI API', message: err.message });
+    console.warn('[IoT Proxy] Fetch mc-list dari API IoT gagal, menggunakan mock fallback:', err.message);
+    res.json({
+      factories: {
+        'Factory 1': [
+          { id: 12, mc: 'ID', machine_code: 'ID', machine_name: 'Machine F1', factory: 'Factory 1', qr_origin: null }
+        ],
+        'Factory 2': [
+          { id: 4, mc: 'MC#3', machine_code: 'MC#3', machine_name: 'Machine Dummy', factory: 'Factory 2', qr_origin: 'QR-1008' },
+          { id: 5, mc: 'MC#4', machine_code: 'MC#4', machine_name: 'Machine Dummy', factory: 'Factory 2', qr_origin: 'QR-1009' },
+          { id: 6, mc: 'MC#5', machine_code: 'MC#5', machine_name: 'Machine Dummy', factory: 'Factory 2', qr_origin: null },
+          { id: 7, mc: 'MC#6', machine_code: 'MC#6', machine_name: '- 2500T', factory: 'Factory 2', qr_origin: 'QR-1004' },
+          { id: 8, mc: 'MC#7', machine_code: 'MC#7', machine_name: 'Machine Dummy', factory: 'Factory 2', qr_origin: null },
+          { id: 9, mc: 'MC#8', machine_code: 'MC#8', machine_name: 'Machine Dummy', factory: 'Factory 2', qr_origin: 'QR-1007' }
+        ],
+        'Factory 3': [
+          { id: 3, mc: 'MC#2', machine_code: 'MC#2', machine_name: 'Machine Dummy', factory: 'Factory 3', qr_origin: 'QR-1002, QR-1003, QR-1006' }
+        ]
+      }
+    });
   }
-});
+};
+
+const handleGetQrListProxy = async (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  try {
+    const siteConfig = await getSiteConfig();
+    const domain = (siteConfig.qr_webhook_domain || 'https://api.polri.web.id').replace(/\/+$/, '');
+    const endpoint = siteConfig.qr_webhook_endpoint_qr_list || '/api/v1/qr-list';
+
+    const response = await fetch(`${domain}${endpoint}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err: any) {
+    console.warn('[IoT Proxy] Fetch qr-list dari API IoT gagal, menggunakan mock fallback:', err.message);
+    res.json([
+      { id: 82, qr: 'QR-1002', part_name: 'BOARD, RR DOOR TRIM, RH/LH', factory: 'Factory 2', machine_origin: 'MC#2' },
+      { id: 84, qr: 'QR-1003', part_name: 'DATA TESTING', factory: 'Factory 2', machine_origin: 'MC#2' },
+      { id: 85, qr: 'QR-1004', part_name: 'DAVEE', factory: 'Factory 2', machine_origin: 'MC#6' },
+      { id: 89, qr: 'QR-1006', part_name: 'FARHAN', factory: 'Factory 2', machine_origin: 'MC#2' }
+    ]);
+  }
+};
+
+qrWebhookRouter.get('/api/polri/mc-list', handleGetMcListProxy);
+qrWebhookRouter.get('/api/qr-webhook/mc-list', handleGetMcListProxy);
+
+qrWebhookRouter.get('/api/polri/qr-list', handleGetQrListProxy);
+qrWebhookRouter.get('/api/qr-webhook/qr-list', handleGetQrListProxy);
 
 qrWebhookRouter.get('/api/polri/debug', async (_req: Request, res: Response) => {
   try {
-    const response = await fetch('https://api.polri.web.id/iot/ws/debug');
+    const siteConfig = await getSiteConfig();
+    const domain = (siteConfig.qr_webhook_domain || 'https://api.polri.web.id').replace(/\/+$/, '');
+    const response = await fetch(`${domain}/iot/ws/debug`);
     const data = await response.json();
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: 'Gagal fetch debug dari POLRI API', message: err.message });
+    res.status(500).json({ error: 'Gagal fetch debug dari API IoT', message: err.message });
   }
 });
 

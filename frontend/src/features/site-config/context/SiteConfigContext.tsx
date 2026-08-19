@@ -28,6 +28,18 @@ interface SiteConfigContextType {
   abnormalityTypesInput: string;
   setAbnormalityTypesInput: (val: string) => void;
 
+  // Webhook Configuration States
+  qrDomainInput: string;
+  setQrDomainInput: (val: string) => void;
+  qrListEpInput: string;
+  setQrListEpInput: (val: string) => void;
+  mcListEpInput: string;
+  setMcListEpInput: (val: string) => void;
+  iotEpInput: string;
+  setIotEpInput: (val: string) => void;
+  isSavingWebhook: boolean;
+  handleSaveWebhook: () => Promise<void>;
+
   // Theme Action States
   isSaving: boolean;
   isDragging: boolean;
@@ -71,6 +83,10 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
   const browserTitle = useThemeStore((state) => state.browserTitle);
   const machineTypes = useThemeStore((state) => state.machineTypes);
   const abnormalityTypes = useThemeStore((state) => state.abnormalityTypes);
+  const qrWebhookDomain = useThemeStore((state) => state.qrWebhookDomain);
+  const qrWebhookEndpointQrList = useThemeStore((state) => state.qrWebhookEndpointQrList);
+  const qrWebhookEndpointMcList = useThemeStore((state) => state.qrWebhookEndpointMcList);
+  const qrWebhookEndpointIot = useThemeStore((state) => state.qrWebhookEndpointIot);
   const updateTheme = useThemeStore((state) => state.updateTheme);
 
   // Form Input States
@@ -82,6 +98,13 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
   const [browserTitleInput, setBrowserTitleInput] = useState(browserTitle);
   const [machineTypesInput, setMachineTypesInput] = useState(machineTypes);
   const [abnormalityTypesInput, setAbnormalityTypesInput] = useState(abnormalityTypes);
+
+  // Webhook Form Input States
+  const [qrDomainInput, setQrDomainInput] = useState(qrWebhookDomain);
+  const [qrListEpInput, setQrListEpInput] = useState(qrWebhookEndpointQrList);
+  const [mcListEpInput, setMcListEpInput] = useState(qrWebhookEndpointMcList);
+  const [iotEpInput, setIotEpInput] = useState(qrWebhookEndpointIot);
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -98,7 +121,24 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
     setBrowserTitleInput(browserTitle);
     setMachineTypesInput(machineTypes);
     setAbnormalityTypesInput(abnormalityTypes);
-  }, [colorPrimary, colorSecondary, colorNavbar, systemTitle, systemLogo, browserTitle, machineTypes, abnormalityTypes]);
+    setQrDomainInput(qrWebhookDomain);
+    setQrListEpInput(qrWebhookEndpointQrList);
+    setMcListEpInput(qrWebhookEndpointMcList);
+    setIotEpInput(qrWebhookEndpointIot);
+  }, [
+    colorPrimary,
+    colorSecondary,
+    colorNavbar,
+    systemTitle,
+    systemLogo,
+    browserTitle,
+    machineTypes,
+    abnormalityTypes,
+    qrWebhookDomain,
+    qrWebhookEndpointQrList,
+    qrWebhookEndpointMcList,
+    qrWebhookEndpointIot,
+  ]);
 
   // Logo Processor
   const processLogoFile = useCallback(async (file: File) => {
@@ -132,6 +172,25 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
     const file = e.dataTransfer.files?.[0];
     if (file) processLogoFile(file);
   }, [processLogoFile]);
+
+  // Save Webhook Config
+  const handleSaveWebhook = useCallback(async () => {
+    setIsSavingWebhook(true);
+    try {
+      await updateTheme({
+        qr_webhook_domain: qrDomainInput,
+        qr_webhook_endpoint_qr_list: qrListEpInput,
+        qr_webhook_endpoint_mc_list: mcListEpInput,
+        qr_webhook_endpoint_iot: iotEpInput,
+      });
+      useToastStore.getState().showToast('Konfigurasi Webhook QR IoT berhasil disimpan!', 'success');
+    } catch (e: any) {
+      const errMsg = e?.response?.data?.message || 'Gagal menyimpan konfigurasi Webhook QR.';
+      useToastStore.getState().showToast(errMsg, 'error');
+    } finally {
+      setIsSavingWebhook(false);
+    }
+  }, [qrDomainInput, qrListEpInput, mcListEpInput, iotEpInput, updateTheme]);
 
   // Save Theme Config
   const handleSaveTheme = useCallback(async () => {
@@ -299,6 +358,16 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
         setMachineTypesInput,
         abnormalityTypesInput,
         setAbnormalityTypesInput,
+        qrDomainInput,
+        setQrDomainInput,
+        qrListEpInput,
+        setQrListEpInput,
+        mcListEpInput,
+        setMcListEpInput,
+        iotEpInput,
+        setIotEpInput,
+        isSavingWebhook,
+        handleSaveWebhook,
         isSaving,
         isDragging,
         setIsDragging,

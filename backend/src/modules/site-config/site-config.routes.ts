@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../rbac/rbac.middleware';
-import { handleGetConfig, handlePutConfig } from './site-config.controller';
+import { handleGetConfig, handlePutConfig, handleTestEndpoint } from './site-config.controller';
 
 export const siteConfigRoutes = Router();
 
@@ -70,3 +70,14 @@ siteConfigRoutes.get('/', handleGetConfig);
  *         description: Bukan super-admin
  */
 siteConfigRoutes.put('/', requireAuth, requireRole('super-admin'), handlePutConfig);
+
+/**
+ * @swagger
+ * /api/site-config/test-endpoint:
+ *   post:
+ *     summary: Tes aksesibilitas endpoint dan tampilkan respon JSON/text
+ *     tags: [SiteConfig]
+ *     security:
+ *       - cookieAuth: []
+ */
+siteConfigRoutes.post('/test-endpoint', requireAuth, handleTestEndpoint);

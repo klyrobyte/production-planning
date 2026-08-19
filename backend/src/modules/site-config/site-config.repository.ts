@@ -2,10 +2,30 @@ import { pool } from '../../config/database';
 import { redis } from '../../config/redis';
 
 // The only allowed config keys
-export const ALLOWED_CONFIG_KEYS = ['color_primary', 'color_secondary', 'color_navbar', 'system_title', 'system_logo', 'browser_title', 'machine_types', 'abnormality_types'] as const;
+export const ALLOWED_CONFIG_KEYS = [
+  'color_primary',
+  'color_secondary',
+  'color_navbar',
+  'system_title',
+  'system_logo',
+  'browser_title',
+  'machine_types',
+  'abnormality_types',
+  'qr_webhook_domain',
+  'qr_webhook_endpoint_qr_list',
+  'qr_webhook_endpoint_mc_list',
+  'qr_webhook_endpoint_iot',
+] as const;
 export type ConfigKey = (typeof ALLOWED_CONFIG_KEYS)[number];
 
 export type SiteConfig = Record<ConfigKey, string>;
+
+export const DEFAULT_SITE_CONFIG: Partial<SiteConfig> = {
+  qr_webhook_domain: 'https://api.polri.web.id',
+  qr_webhook_endpoint_qr_list: '/api/v1/qr-list',
+  qr_webhook_endpoint_mc_list: '/api/v1/mc-list',
+  qr_webhook_endpoint_iot: '/iot/{mc}/{factory}/{qr}',
+};
 
 const REDIS_CACHE_KEY = 'site_config';
 const CACHE_TTL_SECONDS = 60;
@@ -14,7 +34,8 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   // 1. Try Redis cache first
   const cached = await redis.get(REDIS_CACHE_KEY);
   if (cached) {
-    return JSON.parse(cached) as SiteConfig;
+    const parsed = JSON.parse(cached) as SiteConfig;
+    return { ...DEFAULT_SITE_CONFIG, ...parsed } as SiteConfig;
   }
 
   // 2. Fallback to DB
@@ -23,9 +44,11 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     [ALLOWED_CONFIG_KEYS],
   );
 
-  const config = Object.fromEntries(
+  const dbConfig = Object.fromEntries(
     result.rows.map((row) => [row.key, row.value]),
   ) as SiteConfig;
+
+  const config = { ...DEFAULT_SITE_CONFIG, ...dbConfig } as SiteConfig;
 
   // 3. Populate cache
   await redis.set(REDIS_CACHE_KEY, JSON.stringify(config), 'EX', CACHE_TTL_SECONDS);

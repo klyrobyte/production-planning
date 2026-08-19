@@ -402,6 +402,7 @@ export function MachineExecutionView({
     };
   }, [activeJob, machineKey, selectedDate, partsData, isReadOnlyMode, userInitials]);
 
+
   useEffect(() => {
     const socket = initSocket();
     if (!socket.connected) {
@@ -423,20 +424,23 @@ export function MachineExecutionView({
         (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
         (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
         (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
-        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey)));
+        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey))) ||
+        (!incomingPartNumber && !incomingModel);
 
-      if (isMatch || !incomingPartNumber) {
+      if (isMatch) {
         useToastStore.getState().showToast(
-          `[IoT WEBHOOK SCAN] Scan terdeteksi oleh server untuk (${data?.partNumber || data?.model || 'QR-1008'})`,
+          `[IoT SCAN AUTOMATION] Scan terdeteksi oleh sistem! Membuka label Kanban untuk (${data?.partNumber || data?.model || activeJob?.model || 'Part'})`,
           'info'
         );
-        // Backend service kini memproses penambahan Qty & Activity Log secara otomatis
+        setShowPrintModal(true);
       }
     };
 
     socket.on('qr_scanned', handleQrScannedSocket);
+    socket.on('auto_print_kanban_trigger', handleQrScannedSocket);
     return () => {
       socket.off('qr_scanned', handleQrScannedSocket);
+      socket.off('auto_print_kanban_trigger', handleQrScannedSocket);
     };
   }, [machineKey, activeJob]);
 
@@ -1599,18 +1603,7 @@ export function MachineExecutionView({
                     type="number"
                     min={0}
                     value={signOffNgQty}
-                    onChange={(e) => {
-                      const ngVal = e.target.value;
-                      setSignOffNgQty(ngVal);
-                      const ng = parseInt(ngVal) || 0;
-                      const currentJob = jobs.find((j) => j.id === signOffJobId);
-                      const totalActual =
-                        currentJob?.actualQty !== undefined && currentJob.actualQty > 0
-                          ? currentJob.actualQty
-                          : currentJob?.qtyLot || 0;
-                      const ok = Math.max(0, totalActual - ng);
-                      setSignOffOkQty(String(ok));
-                    }}
+                    onChange={(e) => setSignOffNgQty(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-slate-950 dark:text-white outline-none focus:border-[#E76114]"
                   />
                 </div>

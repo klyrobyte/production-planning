@@ -25,22 +25,40 @@ import api from '../../../shared/lib/axios';
 
 export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) {
   const colorPrimary = useThemeStore((state) => state.colorPrimary);
+  const qrWebhookDomain = useThemeStore((state) => state.qrWebhookDomain);
+  const qrWebhookEndpointIot = useThemeStore((state) => state.qrWebhookEndpointIot);
 
-  // POLRI IoT QR List state
+  // Parts listing state
+  const [parts, setParts] = useState<PartItem[]>([]);
+
+  // POLRI IoT QR List & MC List state from Site Configuration
   const [polriQrList, setPolriQrList] = useState<any[]>([]);
+  const [polriMcList, setPolriMcList] = useState<any>(null);
+
+  const fetchIotData = useCallback(async () => {
+    try {
+      const [qrRes, mcRes] = await Promise.allSettled([
+        api.get(`/polri/qr-list?t=${Date.now()}`),
+        api.get(`/polri/mc-list?t=${Date.now()}`)
+      ]);
+
+      if (qrRes.status === 'fulfilled') {
+        const rawData = qrRes.value.data;
+        const items = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.data) ? rawData.data : []);
+        if (Array.isArray(items)) setPolriQrList(items);
+      }
+
+      if (mcRes.status === 'fulfilled') {
+        setPolriMcList(mcRes.value.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch IoT QR or MC list:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('https://api.polri.web.id/api/v1/qr-list')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setPolriQrList(data);
-      })
-      .catch(() => {
-        api.get('/api/polri/qr-list').then((res) => {
-          if (Array.isArray(res.data)) setPolriQrList(res.data);
-        }).catch(() => { });
-      });
-  }, []);
+    fetchIotData();
+  }, [fetchIotData, refreshTrigger]);
 
   const getCleanMachineCode = (lineStr?: string) => {
     if (!lineStr) return '';
@@ -48,37 +66,383 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
     return match ? `mc${match[1]}` : '';
   };
 
-  const handleAutoFillPolriUrl = (isEdit: boolean, qrCodeOverride?: string) => {
-    const targetForm = isEdit ? editForm : manualForm;
-    const targetLine = targetForm.home_line;
+  const [testingPartUrl, setTestingPartUrl] = useState(false);
+  const [partTestResult, setPartTestResult] = useState<any>(null);
 
-    // Cari item POLRI QR yang sesuai dari daftar qr-list
-    const polriItem = polriQrList.find((q) => q.qr === qrCodeOverride);
-
-    // Ambil kode mesin dari Home Line form, atau jika kosong dari machine_origin milik POLRI QR item
-    let mcCode = getCleanMachineCode(targetLine);
-    if (!mcCode && polriItem?.machine_origin) {
-      mcCode = getCleanMachineCode(polriItem.machine_origin);
-    }
-
-    const qr = qrCodeOverride || (polriItem ? polriItem.qr : 'QR-1008');
-    const finalMc = mcCode || (polriItem?.machine_origin ? getCleanMachineCode(polriItem.machine_origin) : 'mc1');
-
-    if (!finalMc && !qrCodeOverride) {
-      useToastStore.getState().showToast('Pilih Home Line mesin atau pilih QR dari dropdown terlebih dahulu.', 'warning');
+  const handleTestPartWebhookUrl = async (url?: string) => {
+    if (!url || !url.trim()) {
+      useToastStore.getState().showToast('URL Webhook QR belum terisi. Auto-generate atau ketik URL terlebih dahulu.', 'warning');
       return;
     }
 
-    const generatedUrl = `https://api.polri.web.id/iot/${finalMc}/${qr}`;
+    setTestingPartUrl(true);
+    setPartTestResult(null);
+    try {
+      const response = await api.post('/site-config/test-endpoint', { url: url.trim() });
+      const resData = response.data;
+      setPartTestResult({
+        url: url.trim(),
+        ok: resData.ok,
+        status: resData.status,
+        statusText: resData.statusText,
+        latencyMs: resData.latencyMs,
+        data: resData.data,
+        error: resData.error,
+      });
+      if (resData.ok) {
+        useToastStore.getState().showToast(`Tes Endpoint Berhasil (${resData.status} ${resData.statusText} - ${resData.latencyMs}ms)`, 'success');
+      } else {
+        useToastStore.getState().showToast(`Gagal Terhubung ke Endpoint (${resData.error || resData.statusText})`, 'error');
+      }
+    } catch (e: any) {
+      useToastStore.getState().showToast(e.response?.data?.error || e.message || 'Gagal mengetes endpoint.', 'error');
+    } finally {
+      setTestingPartUrl(false);
+    }
+  };
+
+  // Computed list of all QR options from Site Config API (mc-list first, then qr-list lookup)
+  const allQrOptions = useMemo(() => {
+    const cleanDomain = (qrWebhookDomain || 'https://api.polri.web.id').replace(/\/+$/, '');
+    const iotPattern = qrWebhookEndpointIot || '/iot/{mc}/{factory}/{qr}';
+
+    // 1. Build lookup map from qr-list for part_name (uppercase qr -> part_name)
+    const qrToPartNameMap = new Map<string, string>();
+    const rawQrList: any[] = Array.isArray(polriQrList)
+      ? polriQrList
+      : (polriQrList && Array.isArray((polriQrList as any).data) ? (polriQrList as any).data : []);
+
+    rawQrList.forEach((item: any) => {
+      if (!item || !item.qr) return;
+      const qrCode = String(item.qr).trim();
+      const partName = item.part_name || item.name || item.partName || '';
+      if (qrCode && partName) {
+        qrToPartNameMap.set(qrCode.toUpperCase(), partName);
+      }
+    });
+
+    // 2. Step 1: Extract machines & QRs from mc-list FIRST
+    const machinesList: Array<{ mc: string; factory: string; machine_name: string; qr_origin?: any }> = [];
+
+    if (polriMcList) {
+      if (Array.isArray(polriMcList)) {
+        machinesList.push(...polriMcList);
+      } else if (Array.isArray(polriMcList?.data)) {
+        machinesList.push(...polriMcList.data);
+      } else if (typeof polriMcList === 'object') {
+        const factoriesObj = polriMcList.factories || (polriMcList.data ? polriMcList.data.factories : null);
+        if (factoriesObj && typeof factoriesObj === 'object') {
+          Object.entries(factoriesObj).forEach(([factName, mcArray]: [string, any]) => {
+            if (Array.isArray(mcArray)) {
+              mcArray.forEach((m: any) => {
+                machinesList.push({
+                  mc: m.mc || m.machine_code || 'MC#1',
+                  factory: m.factory || factName || 'Factory 2',
+                  machine_name: m.machine_name || m.name || 'Machine',
+                  qr_origin: m.qr_origin
+                });
+              });
+            }
+          });
+        }
+      }
+    }
+
+    const map = new Map<string, {
+      qr: string;
+      mc: string;
+      factory: string;
+      partName: string;
+      displayLabel: string;
+      generatedUrl: string;
+      assignedPartNumber?: string;
+      isAvailable: boolean;
+    }>();
+
+    machinesList.forEach((mcItem) => {
+      if (!mcItem || !mcItem.qr_origin) return;
+
+      let qrCodes: string[] = [];
+      if (Array.isArray(mcItem.qr_origin)) {
+        qrCodes = mcItem.qr_origin.map((s: any) => String(s).trim());
+      } else if (typeof mcItem.qr_origin === 'string') {
+        qrCodes = mcItem.qr_origin.split(',').map((s) => s.trim());
+      }
+
+      qrCodes.forEach((qrCode) => {
+        if (!qrCode) return;
+        const upperQr = qrCode.toUpperCase();
+
+        // Step 2: Lookup part_name from qr-list
+        const partName = qrToPartNameMap.get(upperQr) || mcItem.machine_name || 'Part IoT';
+        const displayLabel = `${partName} | ${qrCode}`;
+
+        // Step 4: URL pattern /iot/{mc}/{factory}/{qr}
+        const formattedPath = iotPattern
+          .replace('{mc}', encodeURIComponent(mcItem.mc))
+          .replace('{factory}', encodeURIComponent(mcItem.factory))
+          .replace('{qr}', encodeURIComponent(qrCode));
+        const url = `${cleanDomain}${formattedPath.startsWith('/') ? '' : '/'}${formattedPath}`;
+
+        map.set(upperQr, {
+          qr: qrCode,
+          mc: mcItem.mc,
+          factory: mcItem.factory,
+          partName,
+          displayLabel,
+          generatedUrl: url,
+          isAvailable: true,
+        });
+      });
+    });
+
+    // Fallback: Also include orphan QRs in qr-list not in mc-list
+    rawQrList.forEach((item: any) => {
+      if (!item || !item.qr) return;
+      const qrCode = String(item.qr).trim();
+      const upperQr = qrCode.toUpperCase();
+
+      if (!map.has(upperQr)) {
+        const mc = item.machine_origin || item.mc || 'MC#1';
+        const factory = item.factory || 'Factory 2';
+        const partName = item.part_name || item.name || 'Part IoT';
+        const displayLabel = `${partName} | ${qrCode}`;
+
+        const formattedPath = iotPattern
+          .replace('{mc}', encodeURIComponent(mc))
+          .replace('{factory}', encodeURIComponent(factory))
+          .replace('{qr}', encodeURIComponent(qrCode));
+        const url = `${cleanDomain}${formattedPath.startsWith('/') ? '' : '/'}${formattedPath}`;
+
+        map.set(upperQr, {
+          qr: qrCode,
+          mc,
+          factory,
+          partName,
+          displayLabel,
+          generatedUrl: url,
+          isAvailable: true,
+        });
+      }
+    });
+
+    const options = Array.from(map.values());
+    options.sort((a, b) => a.qr.localeCompare(b.qr, undefined, { numeric: true }));
+
+    // 3. Mark availability against parts in Master Parts DB
+    return options.map((opt) => {
+      const assignedPart = parts.find((p) => {
+        if (!p.qr_webhook_url) return false;
+        const lowerUrl = p.qr_webhook_url.toLowerCase();
+        return lowerUrl.includes(opt.qr.toLowerCase());
+      });
+
+      return {
+        ...opt,
+        assignedPartNumber: assignedPart?.part_number,
+        isAvailable: !assignedPart,
+      };
+    });
+  }, [polriQrList, polriMcList, parts, qrWebhookDomain, qrWebhookEndpointIot]);
+
+  const handleSelectQrOption = (isEdit: boolean, selectedQrCode: string) => {
+    const opt = allQrOptions.find((o) => o.qr === selectedQrCode);
+    if (!opt) return;
+
+    const setTargetForm = isEdit ? setEditForm : setManualForm;
+
+    setTargetForm((prev: Record<string, string>) => {
+      const updated: Record<string, string> = { ...prev, qr_webhook_url: opt.generatedUrl };
+
+      // Auto match home_line machine if possible
+      if (opt.mc && machines.length > 0) {
+        const cleanMc = getCleanMachineCode(opt.mc);
+        const matchedMachine = machines.find((m) => getCleanMachineCode(m.code) === cleanMc);
+        if (matchedMachine) {
+          updated.home_line = matchedMachine.code;
+          updated.tonnage = matchedMachine.tonnage ? String(matchedMachine.tonnage) : prev.tonnage;
+          updated.area = matchedMachine.factory_code ? String(matchedMachine.factory_code) : prev.area;
+        }
+      }
+
+      return updated;
+    });
+
+    useToastStore.getState().showToast(`IoT QR ${selectedQrCode} dipilih (${opt.mc} - ${opt.factory}). Webhook URL & Mesin diperbarui.`, 'info');
+  };
+
+  const handleAutoFillPolriUrl = (isEdit: boolean, qrCodeOverride?: string) => {
+    if (qrCodeOverride) {
+      handleSelectQrOption(isEdit, qrCodeOverride);
+      return;
+    }
+
+    const targetForm = isEdit ? editForm : manualForm;
+    const targetLine = targetForm.home_line;
+
+    let rawMc = targetLine;
+    if (targetLine) {
+      const match = targetLine.match(/(\d+)/);
+      rawMc = match ? `MC#${match[1]}` : targetLine;
+    }
+    if (!rawMc) rawMc = 'MC#1';
+
+    const rawFactory = 'Factory 2';
+    const defaultQr = 'QR-1003';
+
+    const cleanDomain = (qrWebhookDomain || 'https://api.polri.web.id').replace(/\/+$/, '');
+    const iotPattern = qrWebhookEndpointIot || '/iot/{mc}/{factory}/{qr}';
+
+    const formattedPath = iotPattern
+      .replace('{mc}', encodeURIComponent(rawMc))
+      .replace('{factory}', encodeURIComponent(rawFactory))
+      .replace('{qr}', encodeURIComponent(defaultQr));
+
+    const generatedUrl = `${cleanDomain}${formattedPath.startsWith('/') ? '' : '/'}${formattedPath}`;
+
     if (isEdit) {
       setEditForm((prev) => ({ ...prev, qr_webhook_url: generatedUrl }));
     } else {
       setManualForm((prev) => ({ ...prev, qr_webhook_url: generatedUrl }));
     }
+    useToastStore.getState().showToast(`IoT Webhook URL otomatis ter-generate (${rawMc}).`, 'success');
+  };
+
+  const renderIotWebhookSection = (isEdit: boolean) => {
+    const currentUrl = isEdit ? editForm.qr_webhook_url : manualForm.qr_webhook_url;
+
+    // Find if currentUrl matches any option in allQrOptions
+    const matchedOption = allQrOptions.find((opt) => {
+      if (!currentUrl) return false;
+      return currentUrl.toLowerCase().includes(opt.qr.toLowerCase()) || opt.generatedUrl === currentUrl;
+    });
+
+    return (
+      <div className="space-y-2.5 bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+        <div className="flex items-center justify-between">
+          <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-white flex items-center gap-1.5">
+            <Cpu className="w-3.5 h-3.5 text-[#E76114]" />
+            IoT Webhook URL (QR Listener)
+          </label>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleAutoFillPolriUrl(isEdit)}
+              className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              ⚡ Auto-Generate URL
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTestPartWebhookUrl(currentUrl)}
+              disabled={testingPartUrl}
+              className="text-[9px] font-extrabold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+            >
+              {testingPartUrl ? 'Mengecek...' : '🔍 Tes Endpoint'}
+            </button>
+          </div>
+        </div>
+
+        {/* Dropdown Selector for IoT Master QR */}
+        <div className="space-y-1.5">
+          <div className="text-[8.5px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-400 flex items-center justify-between">
+            <span>Pilih QR (Mesin & Part) dari Site Config:</span>
+            {allQrOptions.length > 0 && (
+              <span className="text-[#E76114] font-mono font-bold">
+                {allQrOptions.filter(o => o.isAvailable || (isEdit && selectedPartForEdit && o.assignedPartNumber === selectedPartForEdit.part_number)).length} / {allQrOptions.length} QR Tersedia
+              </span>
+            )}
+          </div>
+          <select
+            onChange={(e) => {
+              if (e.target.value) handleSelectQrOption(isEdit, e.target.value);
+            }}
+            value={matchedOption?.qr || ''}
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2.5 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary cursor-pointer shadow-sm"
+          >
+            <option value="">-- Pilih Dropdown Master QR --</option>
+            {allQrOptions.map((opt) => {
+              const isCurrentOwner = isEdit && selectedPartForEdit && opt.assignedPartNumber === selectedPartForEdit.part_number;
+              const isAvailable = opt.isAvailable || isCurrentOwner;
+
+              let statusBadge = isAvailable
+                ? (isCurrentOwner ? '🟢 [Tersedia - Part Ini]' : '🟢 [Tersedia]')
+                : `🔴 [Terpakai: Part ${opt.assignedPartNumber}]`;
+
+              return (
+                <option key={opt.qr} value={opt.qr}>
+                  {statusBadge} {opt.displayLabel} (Mesin {opt.mc} - {opt.factory})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        {/* Webhook Input Text Field */}
+        <div className="space-y-1">
+          <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-400">Webhook URL Field:</label>
+          <input
+            type="text"
+            name="qr_webhook_url"
+            value={currentUrl || ''}
+            onChange={isEdit ? handleEditInput : handleManualInput}
+            placeholder={`${(qrWebhookDomain || 'https://api.polri.web.id').replace(/\/+$/, '')}/iot/...`}
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary shadow-sm"
+          />
+        </div>
+
+        {/* Matched QR Details & Status Banner */}
+        {matchedOption ? (
+          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 space-y-1 text-[9.5px]">
+            <div className="flex items-center justify-between font-bold">
+              <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                <span className="bg-[#E76114]/10 text-[#E76114] px-1.5 py-0.5 rounded font-mono font-extrabold">
+                  {matchedOption.qr}
+                </span>
+                <span>•</span>
+                <span>Mesin: <strong className="text-slate-900 dark:text-white font-extrabold">{matchedOption.mc}</strong> ({matchedOption.factory})</span>
+              </div>
+              <div>
+                {matchedOption.isAvailable || (isEdit && selectedPartForEdit && matchedOption.assignedPartNumber === selectedPartForEdit.part_number) ? (
+                  <span className="bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-md font-extrabold text-[8.5px] uppercase tracking-wider">
+                    🟢 QR TERSEDIA
+                  </span>
+                ) : (
+                  <span className="bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-md font-extrabold text-[8.5px] uppercase tracking-wider">
+                    🔴 TERPAKAI (Part {matchedOption.assignedPartNumber})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="text-slate-500 dark:text-slate-400 truncate text-[9px]">
+              Part / Item IoT: <strong className="text-slate-700 dark:text-slate-300">{matchedOption.partName}</strong>
+            </div>
+          </div>
+        ) : (
+          <span className="text-[8px] font-mono text-slate-400 block">
+            e.g. {(qrWebhookDomain || 'https://api.polri.web.id').replace(/\/+$/, '')}/iot/mc%231/Factory%202/QR-1003
+          </span>
+        )}
+
+        {/* Test Result Display */}
+        {partTestResult && partTestResult.url === currentUrl && (
+          <div className={`p-2.5 rounded-xl border text-[11px] font-mono leading-relaxed space-y-1 ${partTestResult.ok ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200' : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-200'}`}>
+            <div className="flex items-center justify-between font-bold">
+              <span>{partTestResult.ok ? `✅ HTTP ${partTestResult.status} ${partTestResult.statusText}` : `❌ Gagal (${partTestResult.error || partTestResult.statusText})`}</span>
+              {partTestResult.latencyMs > 0 && <span>⚡ {partTestResult.latencyMs}ms</span>}
+            </div>
+            {partTestResult.data && (
+              <pre className="text-[10px] opacity-90 overflow-x-auto max-h-24 p-1.5 bg-black/10 dark:bg-black/40 rounded">
+                {typeof partTestResult.data === 'object' ? JSON.stringify(partTestResult.data, null, 2) : String(partTestResult.data)}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Parts listing state
-  const [parts, setParts] = useState<PartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [lineFilter, setLineFilter] = useState('ALL');
@@ -87,7 +451,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
   const itemsPerPage = 10;
 
   // Active form tab: CSV Upload vs Manual Form
-  const [activeTab, setActiveTab] = useState<'csv' | 'manual'>('csv');
+  const [activeTab, setActiveTab] = useState<'csv' | 'manual'>('manual');
 
   // CSV Drag/Drop & Import States
   const [isDragOver, setIsDragOver] = useState(false);
@@ -956,49 +1320,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white">
-                        IoT Webhook URL (QR Listener)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleAutoFillPolriUrl(false)}
-                        className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        ⚡ Auto-Generate POLRI URL
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="qr_webhook_url"
-                        value={manualForm.qr_webhook_url || ''}
-                        onChange={handleManualInput}
-                        placeholder="https://api.polri.web.id/iot/mc6/QR-1008"
-                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
-                      />
-                      {polriQrList.length > 0 && (
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) handleAutoFillPolriUrl(false, e.target.value);
-                          }}
-                          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 py-2 px-2 text-[10px] font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer max-w-[130px]"
-                          defaultValue=""
-                        >
-                          <option value="">Pilih POLRI QR...</option>
-                          {polriQrList.map((item: any) => (
-                            <option key={item.id || item.qr} value={item.qr}>
-                              {item.qr} {item.machine_origin ? `[${item.machine_origin}]` : ''} - {item.part_name || 'POLRI'}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <span className="text-[8px] font-mono text-slate-400 block">
-                      e.g. https://api.polri.web.id/iot/mc6/QR-1004
-                    </span>
-                  </div>
+                  {renderIotWebhookSection(false)}
 
                   <button
                     type="submit"
@@ -1288,49 +1610,7 @@ export default function MasterPartsTab({ refreshTrigger }: MasterPartsTabProps) 
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-white">
-                      IoT Webhook URL (QR Listener)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleAutoFillPolriUrl(true)}
-                      className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      ⚡ Auto-Generate POLRI URL
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      name="qr_webhook_url"
-                      value={editForm.qr_webhook_url || ''}
-                      onChange={handleEditInput}
-                      placeholder="https://api.polri.web.id/iot/mc6/QR-1008"
-                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-3 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none transition focus:border-brand-primary"
-                    />
-                    {polriQrList.length > 0 && (
-                      <select
-                        onChange={(e) => {
-                          if (e.target.value) handleAutoFillPolriUrl(true, e.target.value);
-                        }}
-                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-2 px-2 text-[10px] font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer max-w-[130px]"
-                        defaultValue=""
-                      >
-                        <option value="">Pilih POLRI QR...</option>
-                        {polriQrList.map((item: any) => (
-                          <option key={item.id || item.qr} value={item.qr}>
-                            {item.qr} {item.machine_origin ? `[${item.machine_origin}]` : ''} - {item.part_name || 'POLRI'}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <span className="text-[8px] font-mono text-slate-400 block">
-                    e.g. https://api.polri.web.id/iot/mc6/QR-1004
-                  </span>
-                </div>
+                {renderIotWebhookSection(true)}
               </div>
 
               {/* Machine Routing Group */}
