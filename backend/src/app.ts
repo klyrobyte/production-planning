@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { env } from './config/env';
 import cookieParser from 'cookie-parser';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger/swagger.config';
@@ -32,7 +33,15 @@ export const createApp = () => {
   startQrWebhookPoller(1000);
 
   // --- Global Middleware ---
-  app.use(cors({ origin: true, credentials: true }));
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. curl, mobile apps, same-origin)
+      if (!origin) return callback(null, true);
+      if (env.frontendUrls.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    credentials: true,
+  }));
   app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
 

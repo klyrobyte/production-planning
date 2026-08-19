@@ -17,4 +17,7 @@ export const env = {
   pinEncryptionKey: requireEnv('PIN_ENCRYPTION_KEY'),
   cookieName:       'sugity_session',
   cookieMaxAge:     60 * 60 * 24 * 30, // 30 days in seconds
+  // Comma-separated list of allowed frontend origins, e.g.:
+  // https://my-app.vercel.app,https://custom-domain.com
+  frontendUrls:     (process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map(u => u.trim()),
 };

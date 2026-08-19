@@ -26,11 +26,16 @@ export const initSocket = (): Socket => {
 
   _socket = io(socketUrl, {
     autoConnect: false,
-    transports: ['polling', 'websocket'],
+    // WebSocket dulu — lebih efisien & tidak kena CORS repeated polling.
+    // Fallback ke polling hanya jika WebSocket tidak tersedia.
+    transports: ['websocket', 'polling'],
     withCredentials: true,
     auth: {
       token: token,
     },
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
   });
 
   return _socket;

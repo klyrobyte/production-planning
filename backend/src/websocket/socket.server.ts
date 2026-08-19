@@ -10,9 +10,14 @@ export const getIo = (): SocketServer | undefined => ioInstance;
 export const createSocketServer = (httpServer: HttpServer): SocketServer => {
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: '*',
+      origin: env.frontendUrls,
       methods: ['GET', 'POST'],
+      credentials: true,
     },
+    // Lebih robust untuk deployment di Railway (ada proxy/load balancer)
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   // Auth: terima token dari handshake.auth.token (preferred)
