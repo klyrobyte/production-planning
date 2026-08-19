@@ -29,6 +29,7 @@ import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import { useScreenControls } from '../../../../shared/hooks/useScreenControls';
 import { useBtPrinterStore } from '../../../../shared/store/useBtPrinterStore';
 import { useToastStore } from '../../../../shared/store/useToastStore';
+import { sendBtChunked, buildKanbanEscPos } from '../../../../shared/lib/escpos';
 
 function playScanSuccessBeep() {
   try {
@@ -403,47 +404,6 @@ export function MachineExecutionView({
   }, [activeJob, machineKey, selectedDate, partsData, isReadOnlyMode, userInitials]);
 
 
-  useEffect(() => {
-    const socket = initSocket();
-    if (!socket.connected) {
-      socket.connect();
-    }
-
-    const handleQrScannedSocket = (data: any) => {
-      console.log('[Socket QR Scan Event Received]', data);
-      const currentKey = (machineKey || '').toLowerCase();
-      const jobModel = (activeJob?.model || '').toLowerCase();
-      const jobPartNumber = ((activeJob as any)?.partNumber || activeJob?.partName || '').toLowerCase();
-
-      const incomingPartNumber = (data?.partNumber || '').toLowerCase();
-      const incomingModel = (data?.model || '').toLowerCase();
-      const incomingHomeLine = (data?.homeLine || '').toLowerCase();
-      const incomingMachineCode = (data?.machineCode || '').toLowerCase();
-
-      const isMatch =
-        (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
-        (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
-        (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
-        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey))) ||
-        (!incomingPartNumber && !incomingModel);
-
-      if (isMatch) {
-        useToastStore.getState().showToast(
-          `[IoT SCAN AUTOMATION] Scan terdeteksi oleh sistem! Membuka label Kanban untuk (${data?.partNumber || data?.model || activeJob?.model || 'Part'})`,
-          'info'
-        );
-        setShowPrintModal(true);
-      }
-    };
-
-    socket.on('qr_scanned', handleQrScannedSocket);
-    socket.on('auto_print_kanban_trigger', handleQrScannedSocket);
-    return () => {
-      socket.off('qr_scanned', handleQrScannedSocket);
-      socket.off('auto_print_kanban_trigger', handleQrScannedSocket);
-    };
-  }, [machineKey, activeJob]);
-
   const isFirstInShift = useMemo(() => {
     if (!jobs || jobs.length === 0 || !activeJob) return false;
     const firstDayJob = jobs.find((j) => j.shift === 'day');
@@ -522,6 +482,149 @@ export function MachineExecutionView({
 
     return { isLocked, message };
   }, [activeJob, currentLiveTime, abnormality, ngState]);
+
+  useEffect(() => {
+    const socket = initSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleQrScannedSocket = async (data: any) => {
+      console.log('[Socket QR Scan Event Received]', data);
+      const currentKey = (machineKey || '').toLowerCase();
+      const jobModel = (activeJob?.model || '').toLowerCase();
+      const jobPartNumber = ((activeJob as any)?.partNumber || activeJob?.partName || '').toLowerCase();
+
+      const incomingPartNumber = (data?.partNumber || '').toLowerCase();
+      const incomingModel = (data?.model || '').toLowerCase();
+      const incomingHomeLine = (data?.homeLine || '').toLowerCase();
+      const incomingMachineCode = (data?.machineCode || '').toLowerCase();
+
+      const isMatch =
+        (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
+        (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
+        (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
+        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey))) ||
+        (!incomingPartNumber && !incomingModel);
+
+      if (!isMatch) return;
+
+      if (isReadOnlyMode) {
+        useToastStore.getState().showToast('Mode Read-Only: Tidak dapat memproses scan QR pada tanggal lalu.', 'error');
+        return;
+      }
+
+      if (!activeJob) {
+        useToastStore.getState().showToast('Tidak ada Job Aktif pada mesin ini untuk mencetak label.', 'warning');
+        return;
+      }
+
+      if (activeJob.status !== 'running') {
+        useToastStore.getState().showToast(
+          `Job ${activeJob.model} masih dalam tahap Dandori / Persiapan. Selesaikan Dandori terlebih dahulu sebelum mencetak label!`,
+          'warning'
+        );
+        return;
+      }
+
+      if (printLockStatus.isLocked) {
+        useToastStore.getState().showToast(printLockStatus.message, 'warning');
+        return;
+      }
+
+      const printQty = activeJob.spec ?? 24;
+
+      if (isBtConnected && btCharacteristic) {
+        try {
+          const matchedPart = (partsData || []).find(
+            (p: any) => p.part_number === activeJob.model || p.sebango === activeJob.model || p.part_name === activeJob.partName
+          );
+          const sebango = matchedPart?.sebango || activeJob.model || 'U0-****';
+          const customerSebango = matchedPart?.customer_sebango || '';
+          const modelName = matchedPart?.model || activeJob.model || '--';
+          const customerUniqueItems = customerSebango
+            ? customerSebango.split(/[\/,;\+]+/).map((i: string) => i.trim()).filter(Boolean)
+            : [];
+          const customerUniqueStr = customerUniqueItems.length > 0 ? customerUniqueItems.join(' / ') : '-';
+          const targetTotal = activeJob.qtyLot || 0;
+          const totalLabels = targetTotal > 0 ? Math.ceil(targetTotal / printQty) : 0;
+          const printedCount = Math.floor((activeJob.actualQty || 0) / printQty);
+
+          const now = new Date();
+          const dateStr = now.toLocaleDateString('en-GB');
+          const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const initialsSuffix = userInitials ? ` (${userInitials})` : '';
+          const prodDateTimeStr = `${dateStr} - ${timeStr}${initialsSuffix}`;
+
+          const escBytes = buildKanbanEscPos({
+            partNumber: activeJob.model,
+            partName: activeJob.partName || activeJob.model,
+            model: modelName,
+            sebango: sebango,
+            customerUnique: customerUniqueStr,
+            kelipatan: printQty,
+            printedCount: printedCount,
+            totalLabels: totalLabels,
+            prodDateTime: prodDateTimeStr,
+            userInitials: userInitials,
+          });
+
+          await sendBtChunked(btCharacteristic, escBytes);
+          playScanSuccessBeep();
+          incrementJobProgress(machineKey, activeJob.id, printQty, selectedDate, partsData, {
+            type: 'progress',
+            note: getLogNote(`[IoT AUTO-PRINT] Print label ${activeJob.model}: +${printQty} pcs`),
+          });
+          useToastStore.getState().showToast(
+            `[IoT AUTO-PRINT] Label ${activeJob.model} berhasil dicetak via Bluetooth! (+${printQty} pcs)`,
+            'success'
+          );
+        } catch (err: any) {
+          console.error('[IoT Auto-Print Error]', err);
+          useToastStore.getState().showToast(
+            `[IoT SCAN] Gagal auto-print Bluetooth (${err.message || 'Error'}). Membuka modal...`,
+            'warning'
+          );
+          setShowPrintModal(true);
+        }
+      } else if (bypassBtRequirement) {
+        playScanSuccessBeep();
+        incrementJobProgress(machineKey, activeJob.id, printQty, selectedDate, partsData, {
+          type: 'progress',
+          note: getLogNote(`[DEV BYPASS IoT] Print label ${activeJob.model}: +${printQty} pcs`),
+        });
+        useToastStore.getState().showToast(
+          `[DEV BYPASS IoT AUTO-PRINT] Scan terdeteksi! (+${printQty} pcs)`,
+          'success'
+        );
+      } else {
+        useToastStore.getState().showToast(
+          `[IoT SCAN AUTOMATION] Scan terdeteksi! Printer BT belum terhubung. Membuka label Kanban untuk (${data?.partNumber || data?.model || activeJob?.model || 'Part'})`,
+          'info'
+        );
+        setShowPrintModal(true);
+      }
+    };
+
+    socket.on('qr_scanned', handleQrScannedSocket);
+    socket.on('auto_print_kanban_trigger', handleQrScannedSocket);
+    return () => {
+      socket.off('qr_scanned', handleQrScannedSocket);
+      socket.off('auto_print_kanban_trigger', handleQrScannedSocket);
+    };
+  }, [
+    machineKey,
+    activeJob,
+    isReadOnlyMode,
+    printLockStatus,
+    isBtConnected,
+    btCharacteristic,
+    bypassBtRequirement,
+    partsData,
+    selectedDate,
+    userInitials,
+    incrementJobProgress,
+  ]);
 
   useEffect(() => {
     // Sound alarm disabled temporarily as requested

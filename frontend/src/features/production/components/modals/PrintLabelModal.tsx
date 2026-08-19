@@ -3,6 +3,7 @@ import { X, Printer, Check, Tag } from 'lucide-react';
 import { useAuthStore } from '../../../../shared/store/useAuthStore';
 import { useThemeStore } from '../../../../shared/store/useThemeStore';
 import api from '../../../../shared/lib/axios';
+import { sendBtChunked } from '../../../../shared/lib/escpos';
 import QRCode from 'qrcode';
 
 interface PrintLabelModalProps {
@@ -82,12 +83,7 @@ export function PrintLabelModal({
 
   const sendBluetoothData = async (data: Uint8Array) => {
     if (!btCharacteristic) return;
-    const chunkSize = 20;
-    for (let i = 0; i < data.length; i += chunkSize) {
-      const chunk = data.slice(i, i + chunkSize);
-      await btCharacteristic.writeValue(chunk);
-      await new Promise((resolve) => setTimeout(resolve, 15));
-    }
+    await sendBtChunked(btCharacteristic, data);
   };
 
   const generateEscPosData = () => {
