@@ -19,27 +19,15 @@ export async function sendBtChunked(characteristic: any, data: Uint8Array): Prom
   const CHUNK = 20;
   for (let i = 0; i < data.length; i += CHUNK) {
     const chunk = data.slice(i, i + CHUNK);
-    try {
-      if (typeof characteristic.writeValueWithoutResponse === 'function' && characteristic.properties?.writeWithoutResponse) {
-        await characteristic.writeValueWithoutResponse(chunk);
-      } else if (typeof characteristic.writeValueWithResponse === 'function') {
-        await characteristic.writeValueWithResponse(chunk);
-      } else if (typeof characteristic.writeValue === 'function') {
-        await characteristic.writeValue(chunk);
-      } else {
-        throw new Error('No valid write method on characteristic');
-      }
-    } catch (err) {
-      // Fallback to writeValue or writeValueWithoutResponse if primary call failed
-      if (typeof characteristic.writeValue === 'function') {
-        await characteristic.writeValue(chunk);
-      } else if (typeof characteristic.writeValueWithoutResponse === 'function') {
-        await characteristic.writeValueWithoutResponse(chunk);
-      } else {
-        throw err;
-      }
+    if (typeof characteristic.writeValue === 'function') {
+      await characteristic.writeValue(chunk);
+    } else if (typeof characteristic.writeValueWithoutResponse === 'function') {
+      await characteristic.writeValueWithoutResponse(chunk);
+    } else if (typeof characteristic.writeValueWithResponse === 'function') {
+      await characteristic.writeValueWithResponse(chunk);
+    } else {
+      throw new Error('No valid write method found on Bluetooth characteristic');
     }
-    // Delay kecil antar chunk agar printer BLE tidak drop data
     await new Promise<void>((r) => setTimeout(r, 15));
   }
 }
