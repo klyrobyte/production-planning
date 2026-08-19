@@ -527,11 +527,6 @@ export function MachineExecutionView({
         return;
       }
 
-      if (printLockStatus.isLocked) {
-        useToastStore.getState().showToast(printLockStatus.message, 'warning');
-        return;
-      }
-
       const printQty = activeJob.spec ?? 24;
 
       if (isBtConnected && btCharacteristic) {
@@ -616,7 +611,6 @@ export function MachineExecutionView({
     machineKey,
     activeJob,
     isReadOnlyMode,
-    printLockStatus,
     isBtConnected,
     btCharacteristic,
     bypassBtRequirement,
