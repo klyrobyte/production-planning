@@ -500,12 +500,16 @@ export function MachineExecutionView({
       const incomingHomeLine = (data?.homeLine || '').toLowerCase();
       const incomingMachineCode = (data?.machineCode || '').toLowerCase();
 
+      const cleanCurrentKey = currentKey.replace(/[^a-z0-9]/g, '');
+      const cleanIncomingHomeLine = incomingHomeLine.replace(/[^a-z0-9]/g, '');
+      const cleanIncomingMachineCode = incomingMachineCode.replace(/[^a-z0-9]/g, '');
+
       const isMatch =
         (incomingPartNumber && (jobPartNumber.includes(incomingPartNumber) || incomingPartNumber.includes(jobPartNumber))) ||
         (incomingModel && (jobModel.includes(incomingModel) || incomingModel.includes(jobModel))) ||
-        (incomingHomeLine && (currentKey.includes(incomingHomeLine) || incomingHomeLine.includes(currentKey))) ||
-        (incomingMachineCode && (currentKey.includes(incomingMachineCode) || incomingMachineCode.includes(currentKey))) ||
-        (!incomingPartNumber && !incomingModel);
+        (cleanIncomingHomeLine && (cleanIncomingHomeLine.includes(cleanCurrentKey) || cleanCurrentKey.includes(cleanIncomingHomeLine))) ||
+        (cleanIncomingMachineCode && (cleanIncomingMachineCode.includes(cleanCurrentKey) || cleanCurrentKey.includes(cleanIncomingMachineCode))) ||
+        (!incomingPartNumber && !incomingModel && !incomingHomeLine && !incomingMachineCode);
 
       if (!isMatch) return;
 
